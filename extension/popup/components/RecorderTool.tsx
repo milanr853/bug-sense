@@ -1,13 +1,14 @@
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 
 export default function RecorderTool() {
   const [recording, setRecording] = useState(false);
-  const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunks = useRef<BlobPart[]>([]);
+  const chunksRef = useRef<BlobPart[]>([]);
 
   const startRecording = async () => {
     try {
+      // Ask user which screen / window to record
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: false,
@@ -16,85 +17,69 @@ export default function RecorderTool() {
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: "video/webm; codecs=vp9",
       });
-      mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunks.current.push(event.data);
-        }
+        if (event.data.size > 0) chunksRef.current.push(event.data);
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks.current, { type: "video/webm" });
+        const blob = new Blob(chunksRef.current, { type: "video/webm" });
         const url = URL.createObjectURL(blob);
-        setRecordedUrl(url);
-        chunks.current = [];
+        setVideoUrl(url);
+        chunksRef.current = [];
       };
 
       mediaRecorder.start();
+      mediaRecorderRef.current = mediaRecorder;
       setRecording(true);
-    } catch (err) {
-      console.error("Error starting recording:", err);
+
+      // Automatically stop if the user stops sharing
+      stream.getVideoTracks()[0].addEventListener("ended", () => stopRecording());
+    } catch (error) {
+      console.error("Error starting recording:", error);
+      setRecording(false);
     }
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
-    setRecording(false);
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+    }
   };
 
   const downloadRecording = () => {
-    if (!recordedUrl) return;
+    if (!videoUrl) return;
     const a = document.createElement("a");
-    a.href = recordedUrl;
+    a.href = videoUrl;
     a.download = `bug-sense-recording-${Date.now()}.webm`;
     a.click();
   };
 
   return (
-    <div className="w-full">
-      {!recording ? (
-        <button
-          onClick={startRecording}
-          className="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600"
-        >
-          🎥 Start Recording
-        </button>
-      ) : (
-        <button
-          onClick={stopRecording}
-          className="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600"
-        >
-          ⏹ Stop Recording
-        </button>
-      )}
+    <div className="space-y-3">
+      <button
+        onClick={recording ? stopRecording : startRecording}
+        className={`w-full ${
+          recording ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"
+        } text-white py-2 rounded-lg`}
+      >
+        {recording ? "⏹ Stop Recording" : "🎥 Start Recording"}
+      </button>
 
-      {recordedUrl && (
-        <div className="mt-3 flex flex-col items-center space-y-2">
+      {videoUrl && (
+        <div className="text-center mt-3">
           <video
-            src={recordedUrl}
+            src={videoUrl}
             controls
             className="rounded-lg shadow-md w-full max-h-48"
           ></video>
-          <div className="flex gap-2">
-            <button
-              onClick={downloadRecording}
-              className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-            >
-              💾 Download
-            </button>
-            <button
-              onClick={() =>
-                chrome.runtime.sendMessage({
-                  action: "OPEN_GIF_MAKER",
-                  data: recordedUrl,
-                })
-              }
-              className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
-            >
-              🔁 Make GIF
-            </button>
-          </div>
+          <button
+            onClick={downloadRecording}
+            className="mt-2 bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+          >
+            💾 Download
+          </button>
         </div>
       )}
     </div>
