@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-export default function ScreenshotTool() {
+export default function ScreenshotTool({ onAnnotate }: { onAnnotate?: (img: string) => void }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
 
@@ -54,12 +54,15 @@ export default function ScreenshotTool() {
               💾 Download
             </button>
             <button
-              onClick={() => {
-                chrome.runtime.sendMessage({
-                  action: "OPEN_MARKER_TOOL",
-                  data: imageUrl,
-                });
-              }}
+              onClick={
+                //   () => {
+                //   chrome.runtime.sendMessage({
+                //     action: "OPEN_MARKER_TOOL",
+                //     data: imageUrl,
+                //   });
+                // }
+                () => onAnnotate?.(imageUrl)
+              }
               className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded"
             >
               ✏️ Annotate

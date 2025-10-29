@@ -1,61 +1,68 @@
-import React from "react";
-import Header from "./components/Header";
+import React, { useState } from "react";
 import ScreenshotTool from "./components/ScreenshotTool";
 import RecorderTool from "./components/RecorderTool";
 import MarkerTool from "./components/MarkerTool";
 import GifMaker from "./components/GifMaker";
 
 export default function App() {
-  const analyzeSheet = async () => {
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id) {
-        alert("No active tab found");
-        return;
-      }
+  const [activeTool, setActiveTool] = useState<"home" | "marker">("home");
+  const [annotateImage, setAnnotateImage] = useState<string | null>(null);
 
-      // Send a message to the content script to analyze the visible Google Sheet
-      chrome.tabs.sendMessage(tab.id, { action: "ANALYZE_SHEET" }, (response) => {
-        if (chrome.runtime.lastError) {
-          console.error("Analyze message error:", chrome.runtime.lastError);
-          alert("Failed to send analyze request to the page.\nMake sure the page is a Google Sheet and the content scripts are active.");
-          return;
-        }
-        if (!response) {
-          alert("No response from page. The sheet analyzer might not be injected yet.");
-          return;
-        }
-        if (!response.ok) {
-          alert("Sheet analysis failed: " + (response.error || "unknown error"));
-          return;
-        }
-        // Simple ack (detailed results appear in the sheet overlay)
-        alert("Sheet analysis started — results should appear on the sheet (overlay).");
-      });
-    } catch (err) {
-      console.error("Analyze Sheet failed:", err);
-      alert("Analyze Sheet failed: " + (err as any).message);
-    }
+  const handleAnnotate = (image: string) => {
+    setAnnotateImage(image);
+    setActiveTool("marker");
   };
 
-  return (
-    <div className="w-80 p-4 bg-white rounded-lg shadow-lg">
-      <Header />
-      <div className="mt-4 space-y-3">
-        <ScreenshotTool />
-        <RecorderTool />
-        <MarkerTool />
-        <GifMaker />
-        <div>
-          <button
-            onClick={analyzeSheet}
-            className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700"
-          >
-            🧠 Analyze Sheet
-          </button>
+  // Header used for both main and marker views to keep consistent spacing
+  const Header = () => (
+    <div className="flex items-center justify-between">
+      <div>
+        <h2 className="text-lg font-semibold text-gray-800">Bug Sense</h2>
+        <div className="text-xs text-gray-500">v1.0.0</div>
+      </div>
+      <div />
+    </div>
+  );
+
+  if (activeTool === "marker" && annotateImage) {
+    return (
+      <div className="w-[320px] p-3 bg-white rounded-lg shadow-lg">
+        <Header />
+        <div className="mt-3">
+          <MarkerTool
+            image={annotateImage}
+            onClose={() => {
+              setAnnotateImage(null);
+              setActiveTool("home");
+            }}
+          />
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-[320px] p-3 bg-white rounded-lg shadow-lg">
+      <Header />
+
+      <div className="mt-3 space-y-3">
+        <ScreenshotTool onAnnotate={handleAnnotate} />
+
+        <RecorderTool />
+
+        <div className="pt-1">
+          <GifMaker />
+        </div>
+
+        <button
+          className="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 transition"
+          onClick={() => {
+            // Analyze sheet placeholder
+          }}
+        >
+          🧠 Analyze Sheet
+        </button>
       </div>
     </div>
   );
 }
-

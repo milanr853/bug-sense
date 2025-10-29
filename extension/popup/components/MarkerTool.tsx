@@ -1,166 +1,221 @@
 import React, { useRef, useState, useEffect } from "react";
 
 interface MarkerToolProps {
-  image?: string; // screenshot data URL
+  image?: string;
   onClose?: () => void;
 }
 
 export default function MarkerTool({ image, onClose }: MarkerToolProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [drawing, setDrawing] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [tool, setTool] = useState<"pen" | "rect" | "arrow" | "text">("pen");
   const [color, setColor] = useState("#ff0000");
+  const [isDrawing, setIsDrawing] = useState(false);
   const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null);
   const [textInput, setTextInput] = useState("");
+  const [textPos, setTextPos] = useState<{ x: number; y: number } | null>(null);
+  const backgroundRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
-    if (!canvasRef.current || !image) return;
+    if (!image || !canvasRef.current) return;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d")!;
     const img = new Image();
     img.src = image;
     img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx?.drawImage(img, 0, 0);
+      // use natural pixel dimensions for canvas internal coord space
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+
+      // draw image to full res
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // keep canvas visually responsive to popup width:
+      canvas.style.width = "100%";
+      canvas.style.height = "auto";
+
+      backgroundRef.current = img;
     };
   }, [image]);
 
-  const getPos = (e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
-    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  // map client coords -> canvas pixel coords
+  const toCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
   };
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    setDrawing(true);
-    setStartPos(getPos(e));
-  };
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (tool === "text") {
+      const pos = toCanvasCoords(e);
+      setTextPos(pos);
+      return;
+    }
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!drawing || !canvasRef.current || !startPos) return;
-    const ctx = canvasRef.current.getContext("2d");
-    if (!ctx) return;
+    const pos = toCanvasCoords(e);
+    setIsDrawing(true);
+    setStartPos(pos);
 
-    const current = getPos(e);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
+    // snapshot current canvas state once (for shape overlays)
+    if (canvasRef.current) {
+      const snap = new Image();
+      snap.src = canvasRef.current.toDataURL();
+      backgroundRef.current = snap;
+    }
 
-    ctx.beginPath();
-    if (tool === "pen") {
-      ctx.moveTo(startPos.x, startPos.y);
-      ctx.lineTo(current.x, current.y);
-      ctx.stroke();
-      setStartPos(current);
-    } else {
-      // Clear temporary overlay for shapes
-      const img = new Image();
-      img.src = image!;
-      img.onload = () => {
-        ctx.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
-        ctx.drawImage(img, 0, 0);
-        ctx.strokeStyle = color;
-        if (tool === "rect") {
-          ctx.strokeRect(startPos.x, startPos.y, current.x - startPos.x, current.y - startPos.y);
-        } else if (tool === "arrow") {
-          const dx = current.x - startPos.x;
-          const dy = current.y - startPos.y;
-          const angle = Math.atan2(dy, dx);
-          ctx.moveTo(startPos.x, startPos.y);
-          ctx.lineTo(current.x, current.y);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(current.x, current.y);
-          ctx.lineTo(current.x - 10 * Math.cos(angle - Math.PI / 6), current.y - 10 * Math.sin(angle - Math.PI / 6));
-          ctx.lineTo(current.x - 10 * Math.cos(angle + Math.PI / 6), current.y - 10 * Math.sin(angle + Math.PI / 6));
-          ctx.closePath();
-          ctx.fillStyle = color;
-          ctx.fill();
-        }
-      };
+    // init pen drawing path
+    if (tool === "pen" && canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d")!;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
     }
   };
 
-  const stopDrawing = () => setDrawing(false);
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !startPos || !canvasRef.current) return;
+    const ctx = canvasRef.current.getContext("2d")!;
+    const pos = toCanvasCoords(e);
+
+    // pen: continuous without re-draw from snapshot (smooth)
+    if (tool === "pen") {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+      return;
+    }
+
+    // other tools: redraw snapshot then draw shape overlay
+    const bg = backgroundRef.current;
+    if (bg) {
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      ctx.drawImage(bg, 0, 0);
+    }
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+
+    if (tool === "rect") {
+      ctx.strokeRect(startPos.x, startPos.y, pos.x - startPos.x, pos.y - startPos.y);
+    } else if (tool === "arrow") {
+      ctx.beginPath();
+      ctx.moveTo(startPos.x, startPos.y);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      // arrow head
+      const angle = Math.atan2(pos.y - startPos.y, pos.x - startPos.x);
+      const headlen = Math.max(8, canvasRef.current.width / 120);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+      ctx.lineTo(pos.x - headlen * Math.cos(angle - Math.PI / 6), pos.y - headlen * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(pos.x - headlen * Math.cos(angle + Math.PI / 6), pos.y - headlen * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDrawing(false);
+    setStartPos(null);
+  };
 
   const addText = () => {
-    if (!canvasRef.current || !textInput) return;
-    const ctx = canvasRef.current.getContext("2d");
-    if (!ctx) return;
+    if (!canvasRef.current || !textPos || !textInput) return;
+    const ctx = canvasRef.current.getContext("2d")!;
     ctx.font = "20px sans-serif";
     ctx.fillStyle = color;
-    ctx.fillText(textInput, 50, 50);
+    ctx.fillText(textInput, textPos.x, textPos.y);
     setTextInput("");
+    setTextPos(null);
   };
 
   const saveAnnotated = () => {
     if (!canvasRef.current) return;
     const link = document.createElement("a");
-    link.download = `bug-sense-annotated-${Date.now()}.png`;
     link.href = canvasRef.current.toDataURL("image/png");
+    link.download = `bug-sense-annotated-${Date.now()}.png`;
     link.click();
   };
 
   return (
-    <div className="p-3 bg-white rounded-lg shadow-lg">
-      <h3 className="font-semibold mb-2 text-gray-700">🖊️ Marker Tool</h3>
+    <div className="w-full">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <select
+            value={tool}
+            onChange={(e) => setTool(e.target.value as any)}
+            className="border rounded px-2 py-1 text-sm"
+          >
+            <option value="pen">Pen</option>
+            <option value="rect">Rectangle</option>
+            <option value="arrow">Arrow</option>
+            <option value="text">Text</option>
+          </select>
 
-      <div className="flex space-x-2 mb-3">
-        <select
-          value={tool}
-          onChange={(e) => setTool(e.target.value as any)}
-          className="border rounded px-2 py-1 text-sm"
-        >
-          <option value="pen">Pen</option>
-          <option value="rect">Rectangle</option>
-          <option value="arrow">Arrow</option>
-          <option value="text">Text</option>
-        </select>
-        <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
-        <button
-          onClick={saveAnnotated}
-          className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
-        >
-          💾 Save
-        </button>
-        {onClose && (
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            className="w-10 h-8 p-0 border rounded"
+            aria-label="color"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={saveAnnotated}
+            className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-sm"
+          >
+            💾 Save
+          </button>
+
           <button
             onClick={onClose}
-            className="bg-gray-300 text-black px-3 py-1 rounded text-sm hover:bg-gray-400"
+            className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded text-sm"
           >
             ✖ Close
           </button>
-        )}
+        </div>
       </div>
 
       {tool === "text" && (
-        <div className="flex space-x-2 mb-2">
+        <div className="mt-2 flex gap-2">
           <input
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
             placeholder="Enter text"
-            className="border px-2 py-1 text-sm rounded w-full"
+            className="flex-1 border rounded px-2 py-1 text-sm"
           />
-          <button
-            onClick={addText}
-            className="bg-blue-500 text-white px-2 rounded text-sm hover:bg-blue-600"
-          >
+          <button onClick={addText} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
             Add
           </button>
         </div>
       )}
 
-      <div className="relative">
+      <div className="mt-3 border rounded overflow-hidden bg-black">
         <canvas
           ref={canvasRef}
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-          className="border rounded cursor-crosshair max-w-full"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className="w-full block"
+          style={{ cursor: "crosshair", display: "block" }}
         />
       </div>
     </div>
   );
 }
-
