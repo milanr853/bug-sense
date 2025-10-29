@@ -45,7 +45,10 @@
         "extension/popup/*",
         "extension/content/*",
         "extension/styles/*",
-        "extension/icons/*"
+        "extension/icons/*",
+        "extension/uploader.html",
+        "extension/uploader.js",
+        "extension/assets/gif.worker.js"
       ],
       "matches": [
         "<all_urls>"
