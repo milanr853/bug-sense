@@ -42,13 +42,17 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "extension/assets/*",
+        "assets/*",
         "extension/popup/*",
         "extension/content/*",
         "extension/styles/*",
         "extension/icons/*",
         "extension/uploader.html",
         "extension/uploader.js",
-        "extension/assets/gif.worker.js"
+        "extension/assets/gif.worker.js",
+        "extension/recorder.html",
+        "extension/recorder.js"
       ],
       "matches": [
         "<all_urls>"

@@ -1,71 +1,74 @@
+// RecorderTool.tsx
 import React, { useEffect, useState } from "react";
 
+/**
+ * RecorderTool — simplified popup controller.
+ * The recording runs fully inside a separate persistent window (recorder.html).
+ * The popup only launches that window — no stop logic or preview here.
+ */
+
 export default function RecorderTool() {
-  const [recording, setRecording] = useState(false);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
 
   useEffect(() => {
-    chrome.storage.local.get(["isRecording", "recordedVideo"], (data) => {
-      if (data.isRecording) setRecording(true);
-      if (data.recordedVideo) setVideoUrl(data.recordedVideo);
+    // Load recording flag on mount
+    chrome.storage.local.get(["isRecording"], (data) => {
+      setIsRecording(Boolean(data?.isRecording));
     });
 
-    const listener = (
-      changes: Record<string, chrome.storage.StorageChange>
-    ) => {
+    // Watch for recording state updates
+    const handleChange = (changes: Record<string, chrome.storage.StorageChange>) => {
       if (changes.isRecording) {
-        setRecording(changes.isRecording.newValue);
-      }
-      if (changes.recordedVideo) {
-        setVideoUrl(changes.recordedVideo.newValue);
+        setIsRecording(Boolean(changes.isRecording.newValue));
       }
     };
-    chrome.storage.onChanged.addListener(listener);
-    return () => chrome.storage.onChanged.removeListener(listener);
+
+    chrome.storage.onChanged.addListener(handleChange);
+    return () => chrome.storage.onChanged.removeListener(handleChange);
   }, []);
 
   const startRecording = () => {
-    chrome.runtime.sendMessage({ action: "START_RECORDING" });
-  };
+    chrome.runtime.sendMessage({ action: "START_RECORDING" }, (resp) => {
+      if (chrome.runtime.lastError) {
+        console.error("Error starting recording:", chrome.runtime.lastError);
+        alert("Failed to start recording.");
+        return;
+      }
 
-  const stopRecording = () => {
-    chrome.runtime.sendMessage({ action: "STOP_RECORDING" });
-    setRecording(false);
-  };
+      if (resp?.requireRecorderWindow) {
+        // Open the separate recorder window
+        chrome.runtime.sendMessage({ action: "OPEN_RECORDER_WINDOW" });
+        return;
+      }
 
-  const downloadRecording = () => {
-    if (!videoUrl) return;
-    const a = document.createElement("a");
-    a.href = videoUrl;
-    a.download = `bug-sense-${Date.now()}.webm`;
-    a.click();
+      if (resp?.success) {
+        setIsRecording(true);
+        chrome.storage.local.set({ isRecording: true });
+      } else {
+        alert("Could not start recording. Please retry.");
+      }
+    });
   };
 
   return (
-    <div className="space-y-3">
-      {recording && (
-        <div className="text-center text-red-600 font-semibold">
-          🔴 Recording in Progress
-        </div>
-      )}
+    <div className="space-y-3 text-center">
+      {/* Info Text */}
+      {/* <div className="text-sm text-gray-600">
+        Screen recording runs in a separate window.
+      </div> */}
 
+      {/* Start Recording (only) */}
       <button
-        onClick={recording ? stopRecording : startRecording}
-        className={`w-full ${recording ? "bg-red-500" : "bg-green-500"
-          } text-white py-2 rounded-lg hover:opacity-90`}
+        onClick={startRecording}
+        className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg transition"
       >
-        {recording ? "⏹ Stop Recording" : "🎥 Start Recording"}
+        🎥 Start Recording
       </button>
 
-      {videoUrl && (
-        <div className="text-center mt-3">
-          <video src={videoUrl} controls className="rounded-lg shadow-md w-full max-h-48" />
-          <button
-            onClick={downloadRecording}
-            className="mt-2 bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-          >
-            💾 Download
-          </button>
+      {/* Status indicator */}
+      {isRecording && (
+        <div className="text-xs text-red-600 font-medium">
+          🔴 Recording in progress — check recorder window.
         </div>
       )}
     </div>
