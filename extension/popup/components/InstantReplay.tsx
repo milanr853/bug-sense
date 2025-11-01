@@ -65,7 +65,7 @@ export default function InstantReplay(): JSX.Element {
                 const next = prev + 1;
                 return next >= screenshots.length ? 0 : next;
             });
-        }, 800); // change frames every 800ms (tweak as needed)
+        }, 1000); // change frames every 800ms (tweak as needed)
         intervalRef.current = id as unknown as number;
     }
 
@@ -145,6 +145,26 @@ export default function InstantReplay(): JSX.Element {
                         </div>
                     </div>
                 </div>
+                {/* slider / timeline */}
+                <div className="mt-2">
+                    <input
+                        type="range"
+                        min={0}
+                        max={screenshots.length - 1}
+                        value={index}
+                        onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setIndex(val);
+                            setPlaying(false); // pause playback when manually scrubbing
+                        }}
+                        className="w-full accent-amber-500"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>Start</span>
+                        <span>End</span>
+                    </div>
+                </div>
+
             </div>
         );
     };
