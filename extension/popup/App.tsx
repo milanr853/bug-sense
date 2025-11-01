@@ -3,6 +3,7 @@ import ScreenshotTool from "./components/ScreenshotTool";
 import RecorderTool from "./components/RecorderTool";
 import MarkerTool from "./components/MarkerTool";
 import GifMaker from "./components/GifMaker";
+import InstantReplay from "./components/InstantReplay";
 
 export default function App() {
   const [activeTool, setActiveTool] = useState<"home" | "marker">("home");
@@ -50,18 +51,18 @@ export default function App() {
 
         <RecorderTool />
 
-        <div className="pt-1">
-          <GifMaker />
-        </div>
+        <GifMaker />
 
-        <button
+        <InstantReplay />
+
+        {/* <button
           className="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 transition"
           onClick={() => {
             // Analyze sheet placeholder
           }}
         >
           🧠 Analyze Sheet
-        </button>
+        </button> */}
       </div>
     </div>
   );

@@ -12,10 +12,12 @@
     "tabCapture"
   ],
   "host_permissions": [
+    "https://*/*",
+    "http://*/*",
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "extension/background/index.ts",
+    "service_worker": "extension/background/index.js",
     "type": "module"
   },
   "action": {
@@ -29,12 +31,11 @@
   "content_scripts": [
     {
       "matches": [
-        "<all_urls>"
+        "https://*/*",
+        "http://*/*"
       ],
       "js": [
-        "extension/content/consoleListener.ts",
-        "extension/content/googleSheetAnalyzer.ts",
-        "extension/content/screenCapture.ts"
+        "extension/content/replayListener.js"
       ],
       "run_at": "document_idle"
     }
@@ -43,16 +44,12 @@
     {
       "resources": [
         "extension/assets/*",
-        "assets/*",
-        "extension/popup/*",
         "extension/content/*",
+        "extension/background/*",
         "extension/styles/*",
         "extension/icons/*",
         "extension/uploader.html",
-        "extension/uploader.js",
-        "extension/assets/gif.worker.js",
-        "extension/recorder.html",
-        "extension/recorder.js"
+        "extension/recorder.html"
       ],
       "matches": [
         "<all_urls>"
