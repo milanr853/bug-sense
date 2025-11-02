@@ -38,6 +38,15 @@
         "extension/content/replayListener.js"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://docs.google.com/spreadsheets/*"
+      ],
+      "js": [
+        "extension/content/duplicateBugDetector.js"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [

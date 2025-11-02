@@ -17,6 +17,7 @@ export default defineConfig({
         uploader: resolve(__dirname, "extension/uploader.html"),
         background: resolve(__dirname, "extension/background/index.ts"),
         replayListener: resolve(__dirname, "extension/content/replayListener.ts"),
+        duplicateBugDetector: resolve(__dirname, "extension/content/duplicateBugDetector.ts"),
       },
       output: {
         entryFileNames: (chunk) => {
