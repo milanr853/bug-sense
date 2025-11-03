@@ -80,7 +80,7 @@
       ]
     }
   ],
-  "devtools_page": "extension/devtools/index.html",
+  "devtools_page": "extension/devtools/register.html",
   "icons": {
     "16": "extension/icons/icon16.png",
     "48": "extension/icons/icon48.png",

@@ -5,11 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build:main": "vite build",
+    "preview": "vite preview",
+    "build:main": "vite build --config vite.config.ts",
     "build:devtools": "vite build --config vite.config.devtools.ts",
-    "merge:dist": "if [ -d dist-build ]; then rm -rf dist && mv dist-build dist; fi",
-    "build": "npm run build:main && npm run build:devtools && npm run merge:dist",
-    "preview": "vite preview"
+    "build": "rm -rf dist dist-build && npm run build:main && npm run build:devtools"
   },
   "dependencies": {
     "@xenova/transformers": "^2.6.0",
