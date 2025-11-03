@@ -4,9 +4,34 @@ import react from "@vitejs/plugin-react";
 import { crx } from "@crxjs/vite-plugin";
 import manifest from "./extension/manifest.json";
 import { resolve } from "path";
+import fs from "fs";
 
 export default defineConfig({
-  plugins: [react(), crx({ manifest })],
+  plugins: [
+    react(),
+    crx({ manifest }),
+
+    // 🔑 Plugin: Copy key.pem to dist/ after build
+    {
+      name: "copy-key-pem",
+      closeBundle() {
+        try {
+          const src = resolve(__dirname, "key.pem");
+          const dest = resolve(__dirname, "dist/key.pem");
+
+          if (fs.existsSync(src)) {
+            fs.copyFileSync(src, dest);
+            console.log("✅ key.pem copied to dist/");
+          } else {
+            console.warn("⚠️ key.pem not found in project root!");
+          }
+        } catch (err) {
+          console.error("❌ Failed to copy key.pem:", err);
+        }
+      },
+    },
+  ],
+
   build: {
     outDir: "dist",
     emptyOutDir: true,
@@ -30,5 +55,6 @@ export default defineConfig({
       },
     },
   },
+
   publicDir: "public",
 });

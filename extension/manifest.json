@@ -4,18 +4,28 @@
   "description": "AI-powered Chrome extension for testers to capture, analyze, and report bugs efficiently.",
   "version": "1.0.0",
   "permissions": [
+    "identity",
     "activeTab",
     "tabs",
     "storage",
     "scripting",
     "contextMenus",
-    "tabCapture"
+    "tabCapture",
+    "webNavigation"
   ],
   "host_permissions": [
     "https://*/*",
     "http://*/*",
+    "https://www.googleapis.com/*",
+    "https://docs.google.com/*",
     "<all_urls>"
   ],
+  "oauth2": {
+    "client_id": "1081717496361-buvea61ita9ru56o231vmta3kjmlb4bf.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/spreadsheets.readonly"
+    ]
+  },
   "background": {
     "service_worker": "extension/background/index.js",
     "type": "module"
@@ -46,7 +56,8 @@
       "js": [
         "extension/content/duplicateBugDetector.js"
       ],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "web_accessible_resources": [
