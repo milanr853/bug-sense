@@ -17,13 +17,16 @@
     "https://*/*",
     "http://*/*",
     "https://www.googleapis.com/*",
+    "https://sheets.googleapis.com/*",
     "https://docs.google.com/*",
     "<all_urls>"
   ],
   "oauth2": {
     "client_id": "1081717496361-buvea61ita9ru56o231vmta3kjmlb4bf.apps.googleusercontent.com",
     "scopes": [
-      "https://www.googleapis.com/auth/spreadsheets.readonly"
+      "https://www.googleapis.com/auth/spreadsheets",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/drive.readonly"
     ]
   },
   "background": {

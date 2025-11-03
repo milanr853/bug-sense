@@ -74,9 +74,40 @@ function pruneOld() {
 // ─────────────────────────────────────────────────────────────────────────────
 //  Screenshot capture (request background via message)
 // ─────────────────────────────────────────────────────────────────────────────
+// async function requestCaptureFrame(): Promise<string | null> {
+//     try {
+//         return await new Promise((resolve) => {
+//             try {
+//                 chrome.runtime.sendMessage({ action: "CAPTURE_FRAME" }, (resp) => {
+//                     if (chrome.runtime.lastError) {
+//                         console.warn("[replayListener] CAPTURE_FRAME runtime error:", chrome.runtime.lastError);
+//                         resolve(null);
+//                         return;
+//                     }
+//                     if (resp?.success && resp.screenshot) {
+//                         resolve(resp.screenshot as string);
+//                         return;
+//                     }
+//                     resolve(null);
+//                 });
+//             } catch (err) {
+//                 console.warn("[replayListener] CAPTURE_FRAME sendMessage exception:", err);
+//                 resolve(null);
+//             }
+//         });
+//     } catch (err) {
+//         console.warn("[replayListener] requestCaptureFrame outer error:", err);
+//         return null;
+//     }
+// }
 async function requestCaptureFrame(): Promise<string | null> {
     try {
-        return await new Promise((resolve) => {
+        if (!chrome.runtime?.id) {
+            console.log("[replayListener] Extension context invalidated — skipping CAPTURE_FRAME");
+            return null; // 👈 return explicit null instead of undefined
+        }
+
+        const result = await new Promise<string | null>((resolve) => {
             try {
                 chrome.runtime.sendMessage({ action: "CAPTURE_FRAME" }, (resp) => {
                     if (chrome.runtime.lastError) {
@@ -84,10 +115,12 @@ async function requestCaptureFrame(): Promise<string | null> {
                         resolve(null);
                         return;
                     }
+
                     if (resp?.success && resp.screenshot) {
                         resolve(resp.screenshot as string);
                         return;
                     }
+
                     resolve(null);
                 });
             } catch (err) {
@@ -95,11 +128,20 @@ async function requestCaptureFrame(): Promise<string | null> {
                 resolve(null);
             }
         });
+
+        return result; // ✅ ensures Promise<string | null> consistency
+
     } catch (err) {
-        console.warn("[replayListener] requestCaptureFrame outer error:", err);
-        return null;
+        if (String(err).includes("Extension context invalidated")) {
+            console.log("[replayListener] Safe ignore: context invalidated");
+            return null; // 👈 always return null to match type
+        } else {
+            console.warn("[replayListener] requestCaptureFrame outer error:", err);
+            return null;
+        }
     }
 }
+
 
 async function maybeCapture() {
     try {

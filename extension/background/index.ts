@@ -343,3 +343,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+// ========== Simple Caching Layer ==========
+const CACHE_KEY = "bugSenseCache";
+const CACHE_EXPIRY = 1000 * 60 * 10; // 10 minutes
+
+async function getCachedData(sheetId: string, range: string) {
+  const cache = await chrome.storage.local.get(CACHE_KEY);
+  const now = Date.now();
+
+  if (cache[CACHE_KEY] && now - cache[CACHE_KEY].timestamp < CACHE_EXPIRY) {
+    console.log("[BugSense] Loaded data from cache 🧠");
+    return cache[CACHE_KEY].data;
+  }
+
+  // ask content script for new data
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: "FETCH_SHEET_DATA", sheetId, range }, async (response) => {
+      await chrome.storage.local.set({
+        [CACHE_KEY]: { data: response, timestamp: now },
+      });
+      console.log("[BugSense] Cached new data 🧩");
+      resolve(response);
+    });
+  });
+}
