@@ -94,7 +94,7 @@ function tryTabCapture(): Promise<MediaStream | null> {
 
 console.log("[BugSense Background] Service worker active ✅");
 
-chrome.runtime.onMessage.addListener((msg: Msg, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg: any, sender, sendResponse) => {
   (async () => {
     try {
       if (msg.action === "START_RECORDING") {
@@ -211,6 +211,48 @@ chrome.runtime.onMessage.addListener((msg: Msg, sender, sendResponse) => {
         }
         return;
       }
+
+      // ===== APPEND SHEET ROW =====
+      if (msg.action === "APPEND_SHEET_ROW") {
+        const { sheetId, range, row } = msg;
+        (async () => {
+          try {
+            chrome.identity.getAuthToken({ interactive: true }, async (token) => {
+              if (chrome.runtime.lastError || !token) {
+                sendResponse?.({ success: false, error: chrome.runtime.lastError });
+                return;
+              }
+
+              const resp = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(
+                  range
+                )}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+                {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ values: [row] }),
+                }
+              );
+
+              if (!resp.ok) {
+                const j = await resp.json().catch(() => null);
+                sendResponse?.({ success: false, error: j || resp.statusText });
+                return;
+              }
+
+              const j = await resp.json();
+              sendResponse?.({ success: true, result: j });
+            });
+          } catch (err) {
+            sendResponse?.({ success: false, error: String(err) });
+          }
+        })();
+        return true; // keep message channel open
+      }
+
     } catch (outer) {
       console.error("Background onMessage outer error:", outer);
       try {
@@ -367,3 +409,26 @@ async function getCachedData(sheetId: string, range: string) {
     });
   });
 }
+/////////////////////////////////////////
+// === BugSense DevTools bridge ===
+// This allows DevPanel to receive real-time console messages.
+let bugsenseDevPorts: chrome.runtime.Port[] = [];
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === "bugsense-devtools") {
+    console.log("[BugSense] DevTools connected ✅");
+    bugsenseDevPorts.push(port);
+
+    port.onDisconnect.addListener(() => {
+      bugsenseDevPorts = bugsenseDevPorts.filter((p) => p !== port);
+      console.log("[BugSense] DevTools disconnected ❌");
+    });
+  }
+});
+
+// Forward console events to DevTools panel (optional future use)
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (msg.action === "BUGSENSE_CONSOLE") {
+    bugsenseDevPorts.forEach((p) => p.postMessage(msg));
+  }
+});

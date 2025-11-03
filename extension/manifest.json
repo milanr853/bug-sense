@@ -72,7 +72,8 @@
         "extension/styles/*",
         "extension/icons/*",
         "extension/uploader.html",
-        "extension/recorder.html"
+        "extension/recorder.html",
+        "extension/devtools/*"
       ],
       "matches": [
         "<all_urls>"

@@ -200,3 +200,51 @@ export async function highlightDuplicates(
   }
 }
 
+// extension/utils/sheetsAPI.ts  (append to existing file)
+export async function appendRow(sheetId: string, range: string, rowValues: any[]) {
+  // ask background for token
+  const tokenResponse = await new Promise<{ success: boolean; token?: string; error?: any }>((res) => {
+    chrome.runtime.sendMessage({ action: "GET_GOOGLE_TOKEN" }, (response) => res(response));
+  });
+
+  if (!tokenResponse?.success || !tokenResponse.token) {
+    throw new Error("Failed to get token for append");
+  }
+  const token = tokenResponse.token;
+
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+  const body = { values: [rowValues] };
+
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ status: resp.status, statusText: resp.statusText }));
+    throw new Error(`Sheets append error: ${JSON.stringify(err)}`);
+  }
+
+  return await resp.json();
+}
+
+export async function getSheetsProperties(sheetId: string) {
+  const tokenResponse = await new Promise<{ success: boolean; token?: string; error?: any }>((res) => {
+    chrome.runtime.sendMessage({ action: "GET_GOOGLE_TOKEN" }, (response) => res(response));
+  });
+  if (!tokenResponse?.success || !tokenResponse.token) throw new Error("Failed to get token");
+  const token = tokenResponse.token;
+  const resp = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!resp.ok) {
+    const j = await resp.json().catch(() => null);
+    throw new Error(`getSheetsProperties error: ${JSON.stringify(j)}`);
+  }
+  return await resp.json();
+}
+

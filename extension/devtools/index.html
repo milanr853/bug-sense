@@ -1,12 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Bug Helper DevTools</title>
-  </head>
-  <body class="bg-gray-900 text-white">
-    <div id="root"></div>
-    <script type="module" src="/extension/devtools/DevPanel.tsx"></script>
-  </body>
-</html>
+<html>
 
+<head>
+  <meta charset="UTF-8" />
+  <title>BugSense DevTools</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: #fafafa;
+      font-family: sans-serif;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="./main.tsx"></script>
+</body>
+
+</html>
