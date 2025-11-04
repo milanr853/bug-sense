@@ -1,8 +1,12 @@
 // extension/devtools/DevPanel.tsx
 import React, { useEffect, useState, useCallback } from "react";
 // import { analyzeBug } from "../ai/analyze";
-import { FaRegCopy } from "react-icons/fa"; // ✅ --- ADDED THIS IMPORT ---
+import { FaRegCopy } from "react-icons/fa";
 import { getFormattedDate } from "../utils/formattedDate";
+
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { atomDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+// ------------------------------------------
 
 type ConsoleErrorItem = {
   ts: number;
@@ -78,32 +82,6 @@ export default function DevPanel() {
       });
     });
   }, []);
-
-  // const callAIForBug = useCallback(async (
-  //   source: { console?: ConsoleErrorItem; selectionText?: string, srcUrl?: string, linkUrl?: string },
-  //   screenshot: string | null,
-  //   replayActions: any[]
-  // ) => {
-  //   try {
-  //     const result = await analyzeBug({
-  //       ...source,
-  //       screenshot,
-  //       replayActions,
-  //     });
-  //     return result;
-  //   } catch (err) {
-  //     console.error("AI call failed:", err);
-  //     const message = source.console?.message || source.selectionText || source.srcUrl || source.linkUrl || "Bug captured";
-  //     return {
-  //       title: `Bug Report: ${String(message).slice(0, 120)}`,
-  //       description: source.console?.stack || message || "Bug captured",
-  //       steps: [
-  //         "1. See console error or selected text",
-  //         "2. Reproduce steps from logs / replay (see replay actions)"
-  //       ]
-  //     };
-  //   }
-  // }, []);
 
   const callAIForBug = useCallback(async (
     source: { console?: ConsoleErrorItem; selectionText?: string; srcUrl?: string; linkUrl?: string },
@@ -290,7 +268,6 @@ export default function DevPanel() {
     }
   };
 
-  // ✅ --- ADDED THIS NEW FUNCTION ---
   const handleCopyToClipboard = () => {
     if (clipboardData) {
       const dataToCopy = { ...clipboardData };
@@ -316,19 +293,47 @@ export default function DevPanel() {
     }
   };
 
+  // ✅ --- THIS IS THE CORRECTED STYLE ---
   return (
-    <div style={{ padding: 12, width: 420, fontFamily: "Inter, Roboto, sans-serif" }}>
-      <h3 style={{ marginBottom: 8 }}>Bug Sense — Console captures</h3>
-      {/* ... (rest of the top section) ... */}
-      <div style={{ marginBottom: 8, color: "#666", fontSize: 12 }}>
+    <div style={{
+      padding: 12,
+      width: '100%', // Takes full width of its parent
+      // maxWidth: 420, // <-- REMOVED THIS
+      // margin: '0 auto', // <-- REMOVED THIS
+      fontFamily: "Inter, Roboto, sans-serif",
+      background: "#2d2d2d",
+      color: "#e0e0e0",
+      minHeight: "100vh",
+      boxSizing: 'border-box' // Keep padding from breaking layout
+    }}>
+      {/* ... (rest of the component is unchanged) ... */}
+      <h3 style={{
+        marginBottom: 8,
+        display: 'flex',
+        alignItems: 'center',
+        color: "#ffffff"
+      }}>
+        <img
+          src="../icons/icon48.png"
+          alt="Bug Sense icon"
+          style={{
+            marginRight: 8,
+            width: 20,
+            height: 20
+          }}
+        />
+        Bug Sense — Console captures
+      </h3>
+
+      <div style={{ marginBottom: 8, color: "#a0a0a0", fontSize: 12 }}>
         Select a console message to create an AI-generated bug report. Uses instant screenshot + replay buffer.
       </div>
 
       {successBanner && (
         <div
           style={{
-            background: "#16c60c",
-            color: "#fff",
+            background: "#1a911a",
+            color: "#ffffff",
             padding: "6px 10px",
             borderRadius: 6,
             fontSize: 13,
@@ -339,15 +344,28 @@ export default function DevPanel() {
         </div>
       )}
 
-      <div style={{ maxHeight: 320, overflow: "auto", border: "1px solid #eee", padding: 8, borderRadius: 6 }}>
+      <div style={{
+        maxHeight: 320,
+        overflow: "auto",
+        border: "1px solid #444",
+        padding: 8,
+        borderRadius: 6,
+        background: "#252525"
+      }}>
         {errors.length === 0 && <div style={{ color: "#888" }}>No captured console messages (open site & reproduce)</div>}
         {errors.map((e, idx) => (
-          <div key={e.ts + "-" + idx} style={{ marginBottom: 8, padding: 8, borderRadius: 6, background: "#fff", boxShadow: "0 0 0 1px #eee inset" }}>
+          <div key={e.ts + "-" + idx} style={{
+            marginBottom: 8,
+            padding: 8,
+            borderRadius: 6,
+            background: "#3c3c3c",
+            boxShadow: "0 0 0 1px #444 inset"
+          }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{String(e.message).slice(0, 120)}</div>
-              <div style={{ fontSize: 11, color: "#999" }}>{new Date(e.ts).toLocaleTimeString()}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#f0f0f0" }}>{String(e.message).slice(0, 120)}</div>
+              <div style={{ fontSize: 11, color: "#b0b0b0" }}>{new Date(e.ts).toLocaleTimeString()}</div>
             </div>
-            <div style={{ marginTop: 6, fontSize: 12, color: "#444", whiteSpace: "pre-wrap" }}>{e.stack || (e.raw ? JSON.stringify(e.raw) : "")}</div>
+            <div style={{ marginTop: 6, fontSize: 12, color: "#cccccc", whiteSpace: "pre-wrap" }}>{e.stack || (e.raw ? JSON.stringify(e.raw) : "")}</div>
 
             <div style={{ marginTop: 8 }}>
               <button
@@ -360,7 +378,15 @@ export default function DevPanel() {
                   }
                 }}
                 disabled={loading}
-                style={{ marginRight: 8, background: "#0b5cff", color: "white", padding: "6px 10px", borderRadius: 6, border: "none", cursor: "pointer" }}
+                style={{
+                  marginRight: 8,
+                  background: "#3a7dff",
+                  color: "white",
+                  padding: "6px 10px",
+                  borderRadius: 6,
+                  border: "none",
+                  cursor: "pointer"
+                }}
               >
                 Create bug from this error
               </button>
@@ -372,33 +398,40 @@ export default function DevPanel() {
       <div style={{ marginTop: 12 }}>
         <button
           onClick={handlePreviewClick}
-          style={{ background: "#eee", padding: "6px 10px", borderRadius: 6, border: "none", cursor: "pointer" }}
+          style={{
+            background: "#555",
+            color: "#f0f0f0",
+            padding: "6px 10px",
+            borderRadius: 6,
+            border: "1px solid #666",
+            cursor: "pointer"
+          }}
         >
           {isPreviewVisible ? "Hide clipboard" : "Preview clipboard"}
         </button>
       </div>
 
       <div style={{ marginTop: 10 }}>
-        <div style={{ fontSize: 12, color: "#666" }}>{message}</div>
+        <div style={{ fontSize: 12, color: "#a0a0a0" }}>{message}</div>
       </div>
 
-      {/* --- ✅ THIS IS THE MODIFIED PREVIEW BLOCK --- */}
       {isPreviewVisible && (
         <div style={{
           marginTop: 20,
-          background: "#f4f4f4",
-          border: "1px solid #ddd",
+          background: "#252525",
+          border: "1px solid #444",
           borderRadius: 4,
-          maxHeight: 400, // <-- Increased height slightly
+          maxHeight: 400,
           overflow: "auto"
         }}>
-          <h4 style={{
+          <h4 className="sticky top-0" style={{
             margin: 0,
             padding: "8px 12px",
-            borderBottom: "1px solid #ddd",
-            background: "#eee",
+            borderBottom: "1px solid #444",
+            background: "#333",
             fontSize: 13,
             fontWeight: 600,
+            color: "#f0f0f0",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between"
@@ -406,48 +439,45 @@ export default function DevPanel() {
             Clipboard Contents
             <FaRegCopy
               onClick={handleCopyToClipboard}
-              style={{ cursor: "pointer", fontSize: 14, color: "#333" }}
-              title="Copy JSON"
+              style={{ cursor: "pointer", fontSize: 14, color: "#f0f0f0" }}
+              title="Copy JSON (raw)"
             />
           </h4>
 
-          {/* ✅ --- THIS IS THE NEW IMAGE PREVIEW --- */}
           {clipboardData?.screenshotDataUrl && (
-            <div style={{ padding: 12, borderBottom: '1px solid #ddd', background: '#fff' }}>
+            <div style={{ padding: 12, borderBottom: '1px solid #444', background: '#333' }}>
               <img
                 src={clipboardData.screenshotDataUrl}
                 alt="Bug Screenshot"
-                style={{ width: '100%', borderRadius: 4, border: '1px solid #ccc' }}
+                style={{ width: '100%', borderRadius: 4, border: '1px solid #555' }}
                 title="Right-click to copy or save this image"
               />
             </div>
           )}
-          {/* --- END OF IMAGE PREVIEW --- */}
-          <pre style={{
-            margin: 0,
-            padding: 12,
-            fontSize: 11,
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-all"
-          }}>
-            {/* ✅ --- THIS LOGIC HIDES THE IMAGE DATA FROM THE JSON PREVIEW --- */}
+
+          <SyntaxHighlighter
+            language="json"
+            style={atomDark}
+            customStyle={{
+              margin: 0,
+              padding: "12px",
+              fontSize: "11px",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-all",
+              background: "#2d2d2d"
+            }}
+          >
             {(() => {
               if (!clipboardData) return "No clipboard data found.";
-              // Create a copy to modify for display
               const displayData = { ...clipboardData };
-
-              // Delete the key entirely so it doesn't show in the text preview
-              // The image is already displayed above this <pre> block.
               if (displayData.screenshotDataUrl) {
                 delete displayData.screenshotDataUrl;
               }
               return JSON.stringify(displayData, null, 2);
             })()}
-          </pre>
+          </SyntaxHighlighter>
         </div>
       )}
-      {/* --- END OF MODIFIED BLOCK --- */}
-
     </div>
   );
 }

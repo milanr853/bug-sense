@@ -290,10 +290,10 @@ export default function InstantReplay(): JSX.Element {
 
                             <button
                                 onClick={togglePlay}
-                                className="flex items-center justify-center w-10 h-10 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-sm transition"
+                                className="flex items-center justify-center w-8 h-8 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-sm transition"
                                 title={playing ? "Pause" : "Play"}
                             >
-                                {playing ? <FaPause size={16} /> : <FaPlay size={16} />}
+                                {playing ? <FaPause size={12} /> : <FaPlay size={15} />}
                             </button>
 
                             <button
@@ -326,8 +326,8 @@ export default function InstantReplay(): JSX.Element {
                                 )}
                             </button>
 
-                            <div className="text-xs text-gray-500 min-w-[120px] text-right">
-                                {index + 1}/{screenshots.length} •{" "}
+                            <div className="text-xs text-gray-500 text-right">
+                                {index + 1}/{screenshots.length} • <br />
                                 {new Date(screenshots[index].timestamp).toLocaleTimeString()}
                             </div>
                         </div>
