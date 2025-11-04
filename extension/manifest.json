@@ -48,7 +48,8 @@
         "http://*/*"
       ],
       "js": [
-        "extension/content/replayListener.js"
+        "extension/content/replayListener.js",
+        "extension/content/consoleListener.js"
       ],
       "run_at": "document_idle"
     },

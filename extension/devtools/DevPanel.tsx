@@ -1,6 +1,8 @@
 // extension/devtools/DevPanel.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { analyzeBug } from "../ai/analyze";
+import { FaRegCopy } from "react-icons/fa"; // ✅ --- ADDED THIS IMPORT ---
+import { getFormattedDate } from "../utils/formattedDate";
 
 type ConsoleErrorItem = {
   ts: number;
@@ -18,8 +20,8 @@ type BugClipboard = {
   description: string;
   steps: string[];
   screenshotDataUrl?: string | null;
-  createdAt: number;
-  source: { type: "console"; raw: ConsoleErrorItem };
+  createdAt: string;
+  source: { type: "console" | "selection"; raw: any };
   replayActions?: any[];
 };
 
@@ -27,10 +29,13 @@ export default function DevPanel() {
   const [errors, setErrors] = useState<ConsoleErrorItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [successBanner, setSuccessBanner] = useState(false); // ✅ added
+  const [successBanner, setSuccessBanner] = useState(false);
+  const [clipboardData, setClipboardData] = useState<BugClipboard | null>(null);
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+
+  // ... (All your useEffects and functions from createBug... to insertIntoSheet... are unchanged) ...
 
   useEffect(() => {
-    // load errors from storage
     const load = () => {
       chrome.storage.local.get(["recentConsoleErrors"], (res) => {
         const arr = Array.isArray(res?.recentConsoleErrors) ? res.recentConsoleErrors : [];
@@ -38,15 +43,11 @@ export default function DevPanel() {
       });
     };
     load();
-
-    // listen for updates
     const onChange = (changes: any, areaName: string) => {
       if (changes.recentConsoleErrors) {
         const arr = Array.isArray(changes.recentConsoleErrors.newValue) ? changes.recentConsoleErrors.newValue : [];
         setErrors(arr.slice(-200).reverse());
       }
-
-      // ✅ Listen for bug clipboard changes to trigger success banner
       if (changes.bugClipboard && areaName === "local") {
         setSuccessBanner(true);
         setTimeout(() => setSuccessBanner(false), 3000);
@@ -56,32 +57,7 @@ export default function DevPanel() {
     return () => chrome.storage.onChanged.removeListener(onChange);
   }, []);
 
-  // ✅ ADD THIS NEW useEffect BLOCK
-  useEffect(() => {
-    const messageListener = (msg: any) => {
-      if (msg.action === "TRIGGER_BUG_CREATION_FROM_CONTEXT" && msg.selectionText) {
-        console.log("[BugSense Panel] Received trigger from context menu:", msg.selectionText);
-        const selectedText = msg.selectionText;
-        const foundError = errors.find(err =>
-          err.message.includes(selectedText) ||
-          (err.stack && err.stack.includes(selectedText))
-        );
-        if (foundError) {
-          console.log("[BugSense Panel] Found matching error, creating bug...");
-          createBugFromError(foundError);
-        } else {
-          console.warn("[BugSense Panel] Could not find matching error for:", selectedText);
-          setMessage("Error: Could not find matching error in the panel.");
-        }
-      }
-    };
-    chrome.runtime.onMessage.addListener(messageListener);
-    return () => {
-      chrome.runtime.onMessage.removeListener(messageListener);
-    };
-  }, [errors, createBugFromError]);
-
-  async function captureScreenshot() {
+  const captureScreenshot = useCallback(async () => {
     return new Promise<string | null>((resolve) => {
       chrome.runtime.sendMessage({ action: "CAPTURE_FRAME" }, (resp) => {
         if (chrome.runtime.lastError) {
@@ -92,75 +68,65 @@ export default function DevPanel() {
         resolve(resp?.screenshot || null);
       });
     });
-  }
+  }, []);
 
-  async function getReplayActions() {
+  const getReplayActions = useCallback(async () => {
     return new Promise<any[]>((resolve) => {
       chrome.runtime.sendMessage({ action: "GET_REPLAY_LOGS" }, (resp) => {
         if (chrome.runtime.lastError) resolve([]);
         else resolve(resp?.actions || []);
       });
     });
-  }
+  }, []);
 
-  async function callAIForBug(consoleItem: ConsoleErrorItem, screenshot: string | null, replayActions: any[]) {
+  const callAIForBug = useCallback(async (
+    source: { console?: ConsoleErrorItem; selectionText?: string },
+    screenshot: string | null,
+    replayActions: any[]
+  ) => {
     try {
       const result = await analyzeBug({
-        console: consoleItem,
+        ...source,
         screenshot,
         replayActions,
       });
       return result;
     } catch (err) {
       console.error("AI call failed:", err);
+      const message = source.console?.message || source.selectionText || "Bug captured";
       return {
-        title: `Console error: ${String(consoleItem.message).slice(0, 120)}`,
-        description: consoleItem.stack || consoleItem.message || "Console error captured",
+        title: `Bug Report: ${String(message).slice(0, 120)}`,
+        description: source.console?.stack || message || "Bug captured",
         steps: [
-          "1. See console error in DevTools",
+          "1. See console error or selected text",
           "2. Reproduce steps from logs / replay (see replay actions)"
         ]
       };
     }
-  }
+  }, []);
 
-  async function createBugFromError(item: ConsoleErrorItem) {
+  const createBugFromError = useCallback(async (item: ConsoleErrorItem) => {
     setLoading(true);
     setMessage("Capturing screenshot...");
     try {
       const screenshot = await captureScreenshot();
       setMessage("Fetching recent replay actions...");
       const replayActions = await getReplayActions();
-
-      // 🧠 Add this line (AI analysis spinner feedback)
       setMessage("🤖 Analyzing with BugSense AI... This may take a few seconds ⏳");
 
-      // Run local Transformer.js model (or backend, depending on setup)
-      const ai = await callAIForBug(item, screenshot, replayActions).catch((e) => {
-        console.warn("AI fallback: ", e);
-        return {
-          title: `Console error: ${String(item.message).slice(0, 120)}`,
-          description: item.stack || item.message || "Console error captured",
-          steps: [
-            "1. See console error in DevTools",
-            "2. Reproduce steps from logs / replay (see replay actions)"
-          ]
-        };
-      });
+      const ai = await callAIForBug({ console: item }, screenshot, replayActions);
 
       const bug: BugClipboard = {
         title: ai.title,
         description: ai.description,
         steps: ai.steps || [],
         screenshotDataUrl: screenshot,
-        createdAt: Date.now(),
+        createdAt: getFormattedDate(),
         source: { type: "console", raw: item },
         replayActions,
       };
 
-      // store in local clipboard key
       await new Promise((res) => chrome.storage.local.set({ bugClipboard: bug }, () => res(true)));
-
       setMessage("Bug created and saved to BugSense clipboard ✅");
       setLoading(false);
       return bug;
@@ -169,8 +135,53 @@ export default function DevPanel() {
       setMessage("Failed to create bug: " + String(err));
       setLoading(false);
     }
-  }
+  }, [captureScreenshot, getReplayActions, callAIForBug]);
 
+  const createBugFromSelection = useCallback(async (selectionText: string) => {
+    setLoading(true);
+    setMessage("Capturing screenshot for UI bug...");
+    try {
+      const screenshot = await captureScreenshot();
+      setMessage("Fetching recent replay actions...");
+      const replayActions = await getReplayActions();
+      setMessage("🤖 Analyzing UI bug with BugSense AI... ⏳");
+
+      const ai = await callAIForBug({ selectionText: selectionText }, screenshot, replayActions);
+
+      const bug: BugClipboard = {
+        title: ai.title,
+        description: ai.description,
+        steps: ai.steps || [],
+        screenshotDataUrl: screenshot,
+        createdAt: getFormattedDate(),
+        source: { type: "selection", raw: { text: selectionText } },
+        replayActions,
+      };
+
+      await new Promise((res) => chrome.storage.local.set({ bugClipboard: bug }, () => res(true)));
+      setMessage("Bug created and saved to BugSense clipboard ✅");
+      setLoading(false);
+      return bug;
+    } catch (err) {
+      console.error(err);
+      setMessage("Failed to create bug: " + String(err));
+      setLoading(false);
+    }
+  }, [captureScreenshot, getReplayActions, callAIForBug]);
+
+  useEffect(() => {
+    const messageListener = (msg: any) => {
+      if (msg.action === "TRIGGER_BUG_CREATION_FROM_CONTEXT" && msg.selectionText) {
+        console.log("[BugSense Panel] Received trigger from context menu:", msg.selectionText);
+        console.log("[BugSense Panel] Creating new UI bug from selection...");
+        createBugFromSelection(msg.selectionText);
+      }
+    };
+    chrome.runtime.onMessage.addListener(messageListener);
+    return () => {
+      chrome.runtime.onMessage.removeListener(messageListener);
+    };
+  }, [createBugFromSelection]);
 
   async function insertIntoSheet(bug: BugClipboard) {
     try {
@@ -211,14 +222,51 @@ export default function DevPanel() {
     }
   }
 
+  const handlePreviewClick = () => {
+    if (isPreviewVisible) {
+      setIsPreviewVisible(false);
+    } else {
+      chrome.storage.local.get(["bugClipboard"], (res) => {
+        setClipboardData(res?.bugClipboard || null);
+        setIsPreviewVisible(true);
+      });
+    }
+  };
+
+  // ✅ --- ADDED THIS NEW FUNCTION ---
+  const handleCopyToClipboard = () => {
+    if (clipboardData) {
+      const dataToCopy = { ...clipboardData };
+      if (dataToCopy.screenshotDataUrl) {
+        delete dataToCopy.screenshotDataUrl;
+      }
+      const jsonString = JSON.stringify(dataToCopy, null, 2);
+      try {
+        const tempTextArea = document.createElement("textarea");
+        tempTextArea.value = jsonString;
+        tempTextArea.style.position = "absolute";
+        tempTextArea.style.left = "-9999px";
+        document.body.appendChild(tempTextArea);
+        tempTextArea.select();
+        document.execCommand("copy");
+        // Clean up
+        document.body.removeChild(tempTextArea);
+        setMessage("Clipboard JSON copied! ✅");
+      } catch (err) {
+        console.error("Failed to copy text: ", err);
+        setMessage("Failed to copy to clipboard.");
+      }
+    }
+  };
+
   return (
     <div style={{ padding: 12, width: 420, fontFamily: "Inter, Roboto, sans-serif" }}>
       <h3 style={{ marginBottom: 8 }}>Bug Sense — Console captures</h3>
+      {/* ... (rest of the top section) ... */}
       <div style={{ marginBottom: 8, color: "#666", fontSize: 12 }}>
         Select a console message to create an AI-generated bug report. Uses instant screenshot + replay buffer.
       </div>
 
-      {/* ✅ Success banner */}
       {successBanner && (
         <div
           style={{
@@ -228,7 +276,6 @@ export default function DevPanel() {
             borderRadius: 6,
             fontSize: 13,
             marginBottom: 10,
-            animation: "fadeout 3s forwards",
           }}
         >
           ✅ Bug captured successfully!
@@ -260,25 +307,90 @@ export default function DevPanel() {
               >
                 Create bug from this error
               </button>
-
-              <button
-                onClick={() => {
-                  chrome.storage.local.get(["bugClipboard"], (res) => {
-                    alert("Current Bug clipboard preview:\n\n" + JSON.stringify(res?.bugClipboard || {}, null, 2));
-                  });
-                }}
-                style={{ background: "#eee", padding: "6px 10px", borderRadius: 6, border: "none", cursor: "pointer" }}
-              >
-                Preview clipboard
-              </button>
             </div>
           </div>
         ))}
       </div>
 
+      <div style={{ marginTop: 12 }}>
+        <button
+          onClick={handlePreviewClick}
+          style={{ background: "#eee", padding: "6px 10px", borderRadius: 6, border: "none", cursor: "pointer" }}
+        >
+          {isPreviewVisible ? "Hide clipboard" : "Preview clipboard"}
+        </button>
+      </div>
+
       <div style={{ marginTop: 10 }}>
         <div style={{ fontSize: 12, color: "#666" }}>{message}</div>
       </div>
+
+      {/* --- ✅ THIS IS THE MODIFIED PREVIEW BLOCK --- */}
+      {isPreviewVisible && (
+        <div style={{
+          marginTop: 20,
+          background: "#f4f4f4",
+          border: "1px solid #ddd",
+          borderRadius: 4,
+          maxHeight: 400, // <-- Increased height slightly
+          overflow: "auto"
+        }}>
+          <h4 style={{
+            margin: 0,
+            padding: "8px 12px",
+            borderBottom: "1px solid #ddd",
+            background: "#eee",
+            fontSize: 13,
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between"
+          }}>
+            Clipboard Contents
+            <FaRegCopy
+              onClick={handleCopyToClipboard}
+              style={{ cursor: "pointer", fontSize: 14, color: "#333" }}
+              title="Copy JSON"
+            />
+          </h4>
+
+          {/* ✅ --- THIS IS THE NEW IMAGE PREVIEW --- */}
+          {clipboardData?.screenshotDataUrl && (
+            <div style={{ padding: 12, borderBottom: '1px solid #ddd', background: '#fff' }}>
+              <img
+                src={clipboardData.screenshotDataUrl}
+                alt="Bug Screenshot"
+                style={{ width: '100%', borderRadius: 4, border: '1px solid #ccc' }}
+                title="Right-click to copy or save this image"
+              />
+            </div>
+          )}
+          {/* --- END OF IMAGE PREVIEW --- */}
+          <pre style={{
+            margin: 0,
+            padding: 12,
+            fontSize: 11,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-all"
+          }}>
+            {/* ✅ --- THIS LOGIC HIDES THE IMAGE DATA FROM THE JSON PREVIEW --- */}
+            {(() => {
+              if (!clipboardData) return "No clipboard data found.";
+              // Create a copy to modify for display
+              const displayData = { ...clipboardData };
+
+              // Delete the key entirely so it doesn't show in the text preview
+              // The image is already displayed above this <pre> block.
+              if (displayData.screenshotDataUrl) {
+                delete displayData.screenshotDataUrl;
+              }
+              return JSON.stringify(displayData, null, 2);
+            })()}
+          </pre>
+        </div>
+      )}
+      {/* --- END OF MODIFIED BLOCK --- */}
+
     </div>
   );
 }

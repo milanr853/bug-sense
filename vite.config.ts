@@ -45,6 +45,7 @@ export default defineConfig({
         background: resolve(__dirname, "extension/background/index.ts"),
         replayListener: resolve(__dirname, "extension/content/replayListener.ts"),
         duplicateBugDetector: resolve(__dirname, "extension/content/duplicateBugDetector.ts"),
+        consoleListener: resolve(__dirname, "extension/content/consoleListener.ts"),
         // NOTE: Do NOT add devtools HTML here — devtools build is separate
       },
       output: {

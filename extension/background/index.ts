@@ -490,3 +490,22 @@ chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
     sendResponse({ success: true });
   }
 });
+// ✅ ADD THIS ENTIRE BLOCK
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.action === "GET_REPLAY_LOGS") {
+
+    // Read the replay actions from local storage
+    chrome.storage.local.get(["replayActionsLog"], (res) => {
+      if (chrome.runtime.lastError) {
+        console.warn("Error getting replay logs:", chrome.runtime.lastError);
+        sendResponse({ success: false, actions: [] });
+      } else {
+        const actions = res?.replayActionsLog || [];
+        console.log("[BugSense Background] Sent replay actions:", actions);
+        sendResponse({ success: true, actions: actions });
+      }
+    });
+
+    return true; // Keep the message channel open for the async response
+  }
+});
