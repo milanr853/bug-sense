@@ -207,7 +207,7 @@ export default function DevPanel() {
 
   return (
     <div style={{ padding: 12, width: 420, fontFamily: "Inter, Roboto, sans-serif" }}>
-      <h3 style={{ marginBottom: 8 }}>BugSense — Console captures</h3>
+      <h3 style={{ marginBottom: 8 }}>Bug Sense — Console captures</h3>
       <div style={{ marginBottom: 8, color: "#666", fontSize: 12 }}>
         Select a console message to create an AI-generated bug report. Uses instant screenshot + replay buffer.
       </div>
