@@ -185,7 +185,7 @@ chrome.runtime.onMessage.addListener((msg: any, sender, sendResponse) => {
       }
 
       if (msg.action === "OPEN_GIF_UPLOADER") {
-        const url = chrome.runtime.getURL("extension/uploader.html");
+        const url = chrome.runtime.getURL("extension/uploader/uploader.html");
         chrome.windows.create({ url, type: "popup", width: 660, height: 560 }, () => {
           sendResponse({ opened: true });
         });
@@ -193,7 +193,7 @@ chrome.runtime.onMessage.addListener((msg: any, sender, sendResponse) => {
       }
 
       if (msg.action === "OPEN_RECORDER_WINDOW") {
-        const url = chrome.runtime.getURL("extension/recorder.html");
+        const url = chrome.runtime.getURL("extension/recorder/recorder.html");
         chrome.windows.create({ url, type: "popup", width: 720, height: 520 }, () => {
           sendResponse({ opened: true });
         });
