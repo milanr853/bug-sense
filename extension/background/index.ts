@@ -94,6 +94,35 @@ function tryTabCapture(): Promise<MediaStream | null> {
 
 console.log("[BugSense Background] Service worker active ✅");
 
+
+//---------------------------------------------
+// extension/background/index.ts
+// 1. Create the context menu when the extension is installed
+chrome.runtime.onInstalled.addListener(() => {
+  // --- This is the new block to add ---
+  chrome.contextMenus.create({
+    id: "BUGSENSE_CREATE_BUG_FROM_CONSOLE",
+    title: "Bug Sense: Create bug report from this error",
+    // This is the key: it shows the menu ONLY in devtools AND when text is selected
+    contexts: ["selection"]
+  });
+  // --- End of new block ---
+  console.log("[BugSense] Background installed. Context menu created.");
+});
+// 2. Listen for a click on the menu item we just created
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "BUGSENSE_CREATE_BUG_FROM_CONSOLE" && info.selectionText) {
+    console.log("[BugSense] Context menu clicked, selection:", info.selectionText);
+
+    // Send a message to the active DevPanel telling it to create a bug
+    chrome.runtime.sendMessage({
+      action: "TRIGGER_BUG_CREATION_FROM_CONTEXT",
+      selectionText: info.selectionText
+    });
+  }
+});
+//---------------------------------------------
+
 chrome.runtime.onMessage.addListener((msg: any, sender, sendResponse) => {
   (async () => {
     try {
@@ -430,5 +459,34 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (msg.action === "BUGSENSE_CONSOLE") {
     bugsenseDevPorts.forEach((p) => p.postMessage(msg));
+  }
+});
+
+
+//-------------------------------
+chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
+  if (msg.action === "bugsense_create_bug") {
+    const { message, file, line, column, time } = msg.payload;
+
+    // Take screenshot
+    const screenshot = await chrome.tabs.captureVisibleTab();
+
+    // Construct bug object
+    const bug = {
+      title: `Bug from ${file ? file.split("/").pop() : "unknown source"}`,
+      description: message,
+      file,
+      line,
+      column,
+      time,
+      screenshot,
+      steps: "AI will generate reproduction steps from replay and context.",
+      createdAt: new Date().toLocaleString(),
+    };
+
+    await chrome.storage.local.set({ bugsense_clipboard: bug });
+
+    console.log("✅ [BugSense] Bug saved to clipboard:", bug);
+    sendResponse({ success: true });
   }
 });

@@ -52,7 +52,7 @@ async function analyzeVisibleSheet() {
     }
     // Fallback simple parsing: split lines (best-effort)
     const lines = fallbackText.split("\n").slice(0, 200);
-    const items = lines.map((l, i) => ({ id: i, text: l }));
+    const items = lines.map((l: any, i: any) => ({ id: i, text: l }));
     const duplicates = await findDuplicates(items, 0.86);
     renderOverlaySummary(duplicates, items);
     return { fallback: true, itemsCount: items.length, duplicates };
