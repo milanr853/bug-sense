@@ -1,5 +1,5 @@
 // extension/content/duplicateBugDetector.ts
-import { findDuplicates } from "../utils/transformer";
+import { findDuplicates } from "../ai/transformer";
 import { getSheetData, highlightDuplicates } from "../utils/sheetsAPI";
 
 console.log("%c[BugSense] AI Duplicate Bug Detector Active 🧠", "color:#22d3ee");

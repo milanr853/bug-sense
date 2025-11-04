@@ -9,7 +9,7 @@
 
 /* eslint-disable no-console */
 
-import { findDuplicates } from "../utils/transformer";
+import { findDuplicates } from "../ai/transformer";
 
 type RowObject = { rowIndex: number; cells: string[]; rowText: string };
 
