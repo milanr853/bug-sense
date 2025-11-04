@@ -1,18 +1,14 @@
+// backend/ai-server.js
 import express from "express";
+import cors from "cors";
+import aiAnalysisRoute from "./routes/aiAnalysis.js";
+
 const app = express();
+app.use(cors());
 app.use(express.json());
 
-app.post("/ai/analyze", (req, res) => {
-    const { errorText } = req.body;
-    res.json({
-        title: `Bug: ${errorText?.slice(0, 40) || "Unknown Error"}...`,
-        description: `AI analysis of error: ${errorText}`,
-        steps: [
-            "Open the app",
-            "Navigate to the affected page",
-            "Perform the action that triggers this error",
-        ],
-    });
-});
+// Register route
+app.use("/ai", aiAnalysisRoute);
 
-app.listen(3000, () => console.log("✅ AI mock server running at http://localhost:3000"));
+const PORT = 3000;
+app.listen(PORT, () => console.log(`🤖 BugSense AI backend running on port ${PORT}`));
