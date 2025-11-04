@@ -1,4 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
+import { IoIosSave } from "react-icons/io";
+import { IoClose } from "react-icons/io5";
 
 interface MarkerToolProps {
   image?: string;
@@ -175,18 +177,18 @@ export default function MarkerTool({ image, onClose }: MarkerToolProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
+          <button title="Save"
             onClick={saveAnnotated}
             className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-sm"
           >
-            💾 Save
+            <IoIosSave  />
           </button>
 
-          <button
+          <button title="Close"
             onClick={onClose}
             className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded text-sm"
           >
-            ✖ Close
+            <IoClose  />
           </button>
         </div>
       </div>

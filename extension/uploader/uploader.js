@@ -136,17 +136,17 @@ window.GIF = GIF;
         };
 
         // --- Copy link ---
-        const copyBtn = document.createElement("button");
-        copyBtn.textContent = "📋 Copy Path";
-        copyBtn.style.marginRight = "8px";
-        copyBtn.onclick = async () => {
-          try {
-            await navigator.clipboard.writeText(blobUrl);
-            alert("GIF Blob URL copied!");
-          } catch (err) {
-            alert("Clipboard error: " + err.message);
-          }
-        };
+        // const copyBtn = document.createElement("button");
+        // copyBtn.textContent = "📋 Copy Path";
+        // copyBtn.style.marginRight = "8px";
+        // copyBtn.onclick = async () => {
+        //   try {
+        //     await navigator.clipboard.writeText(blobUrl);
+        //     alert("GIF Blob URL copied!");
+        //   } catch (err) {
+        //     alert("Clipboard error: " + err.message);
+        //   }
+        // };
 
         // --- Close button ---
         const manualCloseBtn = document.createElement("button");
@@ -154,7 +154,7 @@ window.GIF = GIF;
         manualCloseBtn.onclick = () => window.close();
 
         controls.appendChild(downloadBtn);
-        controls.appendChild(copyBtn);
+        // controls.appendChild(copyBtn);
         controls.appendChild(manualCloseBtn);
 
         // --- Store privately (popup won't detect this key) ---
