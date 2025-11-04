@@ -1,10 +1,11 @@
 import React from "react";
-import { createRoot } from "react-dom/client";
+import ReactDOM from "react-dom/client";
 import DevPanel from "./DevPanel";
 
-const container = document.getElementById("root");
-if (container) {
-  const root = createRoot(container);
-  root.render(<DevPanel />);
-}
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+  <React.StrictMode>
+    <DevPanel />
+  </React.StrictMode>
+);
 
+console.log("[BugSense] DevTools React app mounted ✅");

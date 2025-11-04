@@ -183,7 +183,7 @@ export default function DevPanel() {
         (bug.steps || []).join("\n"),
         bug.screenshotDataUrl ? "screenshot_attached" : "",
         new Date(bug.createdAt).toISOString(),
-        "BugSense", // reported by
+        "Bug Sense", // reported by
       ];
 
       setMessage("Appending row to spreadsheet...");
