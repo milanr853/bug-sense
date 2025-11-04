@@ -32,7 +32,7 @@ export default function InstantReplay(): JSX.Element {
     const [buildProgress, setBuildProgress] = useState(0);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-
+    const [showReplay, setShowReplay] = useState(false);
     const intervalRef = useRef<number | null>(null);
 
     useEffect(() => {
@@ -269,105 +269,115 @@ export default function InstantReplay(): JSX.Element {
 
     return (
         <div className="space-y-2">
-            <div className="text-sm font-medium text-gray-700 text-center">🔁 Instant Visual Replay</div>
+            <button
+                onClick={() => setShowReplay(prev => !prev)}
+                className="w-full bg-slate-400 hover:bg-slate-500 text-white py-2 rounded-lg transition"
+                title="Toggle replay preview"
+            >
+                🔁 Instant Visual Replay
+            </button>
 
-            {screenshots && screenshots.length > 0 ? (
-                <div className="space-y-2">
-                    <div className="bg-black rounded overflow-hidden">
-                        <img src={screenshots[index].screenshot} alt="replay frame" className="w-full object-contain max-h-48" />
-                    </div>
+            {showReplay && <>
+                <div className="text-sm font-medium text-gray-700 text-center">🔁 Instant Visual Replay</div>
 
-                    <div className="flex items-center justify-between gap-3 py-1">
-                        {/* Left controls: prev / play-pause / next */}
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={prevFrame}
-                                className="flex items-center justify-center w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-full transition"
-                                title="Previous Frame"
-                            >
-                                ◀
-                            </button>
-
-                            <button
-                                onClick={togglePlay}
-                                className="flex items-center justify-center w-8 h-8 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-sm transition"
-                                title={playing ? "Pause" : "Play"}
-                            >
-                                {playing ? <FaPause size={12} /> : <FaPlay size={15} />}
-                            </button>
-
-                            <button
-                                onClick={nextFrame}
-                                className="flex items-center justify-center w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-full transition"
-                                title="Next Frame"
-                            >
-                                ▶
-                            </button>
+                {screenshots && screenshots.length > 0 ? (
+                    <div className="space-y-2">
+                        <div className="bg-black rounded overflow-hidden">
+                            <img src={screenshots[index].screenshot} alt="replay frame" className="w-full object-contain max-h-48" />
                         </div>
 
-                        {/* Right controls: download + index/timestamp */}
-                        <div className="flex items-center gap-3">
-                            <button
-                                title="Download Replay as Video"
-                                onClick={buildVideoAndDownload}
-                                disabled={isBuilding}
-                                className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md font-medium text-white shadow-sm transition ${isBuilding
-                                    ? "bg-indigo-400 cursor-wait"
-                                    : "bg-indigo-600 hover:bg-indigo-700"
-                                    }`}
-                            >
-                                {isBuilding ? (
-                                    <span className="text-xs">{`Building... ${buildProgress}%`}</span>
-                                ) : (
-                                    <>
-                                        <FaDownload size={14} />
-                                        <span className="text-xs font-semibold">Export</span>
-                                    </>
-                                )}
-                            </button>
+                        <div className="flex items-center justify-between gap-3 py-1">
+                            {/* Left controls: prev / play-pause / next */}
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={prevFrame}
+                                    className="flex items-center justify-center w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-full transition"
+                                    title="Previous Frame"
+                                >
+                                    ◀
+                                </button>
 
-                            <div className="text-xs text-gray-500 text-right">
-                                {index + 1}/{screenshots.length} • <br />
-                                {new Date(screenshots[index].timestamp).toLocaleTimeString()}
+                                <button
+                                    onClick={togglePlay}
+                                    className="flex items-center justify-center w-8 h-8 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-sm transition"
+                                    title={playing ? "Pause" : "Play"}
+                                >
+                                    {playing ? <FaPause size={12} /> : <FaPlay size={15} />}
+                                </button>
+
+                                <button
+                                    onClick={nextFrame}
+                                    className="flex items-center justify-center w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-full transition"
+                                    title="Next Frame"
+                                >
+                                    ▶
+                                </button>
+                            </div>
+
+                            {/* Right controls: download + index/timestamp */}
+                            <div className="flex items-center gap-3">
+                                <button
+                                    title="Download Replay as Video"
+                                    onClick={buildVideoAndDownload}
+                                    disabled={isBuilding}
+                                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md font-medium text-white shadow-sm transition ${isBuilding
+                                        ? "bg-indigo-400 cursor-wait"
+                                        : "bg-indigo-600 hover:bg-indigo-700"
+                                        }`}
+                                >
+                                    {isBuilding ? (
+                                        <span className="text-xs">{`Building... ${buildProgress}%`}</span>
+                                    ) : (
+                                        <>
+                                            <FaDownload size={14} />
+                                            <span className="text-xs font-semibold">Export</span>
+                                        </>
+                                    )}
+                                </button>
+
+                                <div className="text-xs text-gray-500 text-right">
+                                    {index + 1}/{screenshots.length} • <br />
+                                    {new Date(screenshots[index].timestamp).toLocaleTimeString()}
+                                </div>
                             </div>
                         </div>
-                    </div>
 
 
-                    {/* progress bar */}
-                    {isBuilding && (
-                        <div className="w-full bg-gray-200 h-2 rounded overflow-hidden mt-2">
-                            <div className="bg-blue-500 h-2" style={{ width: `${buildProgress}%`, transition: "width 0.2s" }} />
-                        </div>
-                    )}
-
-                    {error && <div className="text-xs text-red-600">{error}</div>}
-
-                    {videoUrl && (
-                        <div className="mt-2">
-                            <video src={videoUrl} controls className="w-full rounded shadow-md" />
-                        </div>
-                    )}
-                </div>
-            ) : (
-                <div className="text-sm text-gray-600">No recent screenshots available. Showing textual actions instead.</div>
-            )}
-
-            {/* textual fallback */}
-            {screenshots.length === 0 && actions && actions.length > 0 && (
-                <div className="text-left text-sm max-h-48 overflow-auto">
-                    {actions.slice().reverse().slice(0, 30).map((a, idx) => (
-                        <div key={idx} className="py-1 border-b border-gray-100">
-                            <div className="text-xs text-gray-500">{new Date(a.timestamp).toLocaleTimeString()}</div>
-                            <div className="text-sm">
-                                <strong>{String(a.type).toUpperCase()}</strong> — <span className="text-gray-700">{JSON.stringify(a.details)}</span>
+                        {/* progress bar */}
+                        {isBuilding && (
+                            <div className="w-full bg-gray-200 h-2 rounded overflow-hidden mt-2">
+                                <div className="bg-blue-500 h-2" style={{ width: `${buildProgress}%`, transition: "width 0.2s" }} />
                             </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+                        )}
 
-            <div className="text-xs text-gray-500 text-center">Shows visual replay (latest ~30-60s snapshots). Export to WebM video.</div>
+                        {error && <div className="text-xs text-red-600">{error}</div>}
+
+                        {videoUrl && (
+                            <div className="mt-2">
+                                <video src={videoUrl} controls className="w-full rounded shadow-md" />
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="text-sm text-gray-600">No recent screenshots available. Showing textual actions instead.</div>
+                )}
+
+                {/* textual fallback */}
+                {screenshots.length === 0 && actions && actions.length > 0 && (
+                    <div className="text-left text-sm max-h-48 overflow-auto">
+                        {actions.slice().reverse().slice(0, 30).map((a, idx) => (
+                            <div key={idx} className="py-1 border-b border-gray-100">
+                                <div className="text-xs text-gray-500">{new Date(a.timestamp).toLocaleTimeString()}</div>
+                                <div className="text-sm">
+                                    <strong>{String(a.type).toUpperCase()}</strong> — <span className="text-gray-700">{JSON.stringify(a.details)}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <div className="text-xs text-gray-500 text-center">Shows visual replay (latest ~30-60s snapshots). Export to WebM video.</div>
+            </>}
         </div>
     );
 }
