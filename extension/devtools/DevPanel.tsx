@@ -1,6 +1,6 @@
 // extension/devtools/DevPanel.tsx
 import React, { useEffect, useState, useCallback } from "react";
-import { analyzeBug } from "../ai/analyze";
+// import { analyzeBug } from "../ai/analyze";
 import { FaRegCopy } from "react-icons/fa"; // ✅ --- ADDED THIS IMPORT ---
 import { getFormattedDate } from "../utils/formattedDate";
 
@@ -79,31 +79,76 @@ export default function DevPanel() {
     });
   }, []);
 
+  // const callAIForBug = useCallback(async (
+  //   source: { console?: ConsoleErrorItem; selectionText?: string, srcUrl?: string, linkUrl?: string },
+  //   screenshot: string | null,
+  //   replayActions: any[]
+  // ) => {
+  //   try {
+  //     const result = await analyzeBug({
+  //       ...source,
+  //       screenshot,
+  //       replayActions,
+  //     });
+  //     return result;
+  //   } catch (err) {
+  //     console.error("AI call failed:", err);
+  //     const message = source.console?.message || source.selectionText || source.srcUrl || source.linkUrl || "Bug captured";
+  //     return {
+  //       title: `Bug Report: ${String(message).slice(0, 120)}`,
+  //       description: source.console?.stack || message || "Bug captured",
+  //       steps: [
+  //         "1. See console error or selected text",
+  //         "2. Reproduce steps from logs / replay (see replay actions)"
+  //       ]
+  //     };
+  //   }
+  // }, []);
+
   const callAIForBug = useCallback(async (
-    source: { console?: ConsoleErrorItem; selectionText?: string, srcUrl?: string, linkUrl?: string },
+    source: { console?: ConsoleErrorItem; selectionText?: string; srcUrl?: string; linkUrl?: string },
     screenshot: string | null,
     replayActions: any[]
   ) => {
     try {
-      const result = await analyzeBug({
-        ...source,
-        screenshot,
-        replayActions,
+      setMessage("🤖 Sending data to BugSense AI backend...");
+      const response = await fetch("http://localhost:3000/ai/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...source,
+          screenshot,
+          replayActions,
+        }),
       });
-      return result;
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`AI backend error: ${text}`);
+      }
+
+      const ai = await response.json();
+      console.log("[BugSense AI] Response from backend:", ai);
+      return ai;
     } catch (err) {
-      console.error("AI call failed:", err);
-      const message = source.console?.message || source.selectionText || source.srcUrl || source.linkUrl || "Bug captured";
+      console.error("AI backend call failed:", err);
+      const message =
+        source.console?.message ||
+        source.selectionText ||
+        source.srcUrl ||
+        source.linkUrl ||
+        "Bug captured (AI unavailable)";
       return {
         title: `Bug Report: ${String(message).slice(0, 120)}`,
-        description: source.console?.stack || message || "Bug captured",
+        description: source.console?.stack || message || "Bug captured manually",
         steps: [
-          "1. See console error or selected text",
-          "2. Reproduce steps from logs / replay (see replay actions)"
-        ]
+          "1. Observe the error or selected text",
+          "2. Reproduce steps from replay buffer",
+        ],
       };
     }
   }, []);
+
 
   const createBugFromError = useCallback(async (item: ConsoleErrorItem) => {
     setLoading(true);

@@ -4,7 +4,7 @@
   "description": "AI-powered Chrome extension for testers to capture, analyze, and report bugs efficiently.",
   "version": "1.0.0",
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; script-src-elem 'self' 'wasm-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://huggingface.co https://*.hf.co https://cdn.jsdelivr.net; img-src 'self' data:; default-src 'self';"
+    "extension_pages": "script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:3000; img-src 'self' data:; default-src 'self';"
   },
   "permissions": [
     "identity",
@@ -23,6 +23,8 @@
     "https://sheets.googleapis.com/*",
     "https://docs.google.com/*",
     "https://huggingface.co/*",
+    "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*",
     "<all_urls>"
   ],
   "oauth2": {
