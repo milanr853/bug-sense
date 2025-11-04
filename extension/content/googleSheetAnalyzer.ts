@@ -46,7 +46,7 @@ async function analyzeVisibleSheet() {
 
   if (!gridCells || gridCells.length === 0) {
     // fallback: try to read visible plain text cells
-    const fallbackText = document.querySelector("div.docs-sheet-view")?.innerText;
+    const fallbackText = (document.querySelector("div.docs-sheet-view") as HTMLElement)?.innerText;
     if (!fallbackText) {
       throw new Error("Couldn't detect sheet cells in DOM. Make sure the sheet is open and active.");
     }
