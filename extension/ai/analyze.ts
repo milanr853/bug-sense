@@ -16,11 +16,13 @@ export async function initAI() {
 // Main AI function to generate bug report details
 export async function analyzeBug(input: {
     console?: any;
-    selectionText?: string; // <--- ADDED THIS
+    selectionText?: string; // <--- ADDED THIS,
+    srcUrl?: string; // <-- ADD THIS
+    linkUrl?: string;
     screenshot?: string | null;
     replayActions?: any[];
 }) {
-    const { console: consoleError, selectionText, replayActions } = input;
+    const { console: consoleError, selectionText, srcUrl, linkUrl, replayActions } = input;
 
     // --- THIS IS THE NEW LOGIC ---
     // Build context for the AI based on what we have
@@ -33,8 +35,14 @@ export async function analyzeBug(input: {
       Stack: ${consoleError.stack || ""}
     `;
     } else if (selectionText) {
+        contextText = `UI Bug: User selected this text on the page: "${selectionText}"
+    `;
+    } else if (srcUrl) {
+        contextText = `UI Bug: User right-clicked this image: "${srcUrl}"
+    `;
+    } else if (linkUrl) { // ✅ --- ADD THIS BLOCK ---
         contextText = `
-      UI Bug: User selected this text on the page: "${selectionText}"
+      UI Bug: User right-clicked this link: "${linkUrl}"
     `;
     }
     contextText += `\nActions before error: ${JSON.stringify(
@@ -72,7 +80,12 @@ export async function analyzeBug(input: {
 
     return {
         title: titleSummary[0].summary_text || "Auto Bug Report",
-        description: descSummary[0].summary_text || consoleError?.message || selectionText,
+        description:
+            descSummary[0].summary_text ||
+            consoleError?.message ||
+            selectionText ||
+            (srcUrl ? `Image bug: ${srcUrl}` : null) ||
+            (linkUrl ? `Link bug: ${linkUrl}` : "Bug captured"),
         steps:
             steps.length > 0
                 ? steps

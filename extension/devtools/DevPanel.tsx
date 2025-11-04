@@ -21,7 +21,7 @@ type BugClipboard = {
   steps: string[];
   screenshotDataUrl?: string | null;
   createdAt: string;
-  source: { type: "console" | "selection"; raw: any };
+  source: { type: "console" | "selection" | "image" | "link"; raw: any };
   replayActions?: any[];
 };
 
@@ -80,7 +80,7 @@ export default function DevPanel() {
   }, []);
 
   const callAIForBug = useCallback(async (
-    source: { console?: ConsoleErrorItem; selectionText?: string },
+    source: { console?: ConsoleErrorItem; selectionText?: string, srcUrl?: string, linkUrl?: string },
     screenshot: string | null,
     replayActions: any[]
   ) => {
@@ -93,7 +93,7 @@ export default function DevPanel() {
       return result;
     } catch (err) {
       console.error("AI call failed:", err);
-      const message = source.console?.message || source.selectionText || "Bug captured";
+      const message = source.console?.message || source.selectionText || source.srcUrl || source.linkUrl || "Bug captured";
       return {
         title: `Bug Report: ${String(message).slice(0, 120)}`,
         description: source.console?.stack || message || "Bug captured",
@@ -137,7 +137,7 @@ export default function DevPanel() {
     }
   }, [captureScreenshot, getReplayActions, callAIForBug]);
 
-  const createBugFromSelection = useCallback(async (selectionText: string) => {
+  const createBugFromContext = useCallback(async (context: { selectionText?: string, srcUrl?: string, linkUrl?: string }) => {
     setLoading(true);
     setMessage("Capturing screenshot for UI bug...");
     try {
@@ -146,7 +146,15 @@ export default function DevPanel() {
       const replayActions = await getReplayActions();
       setMessage("🤖 Analyzing UI bug with BugSense AI... ⏳");
 
-      const ai = await callAIForBug({ selectionText: selectionText }, screenshot, replayActions);
+      const ai = await callAIForBug(context, screenshot, replayActions);
+
+      let rawSource = context.selectionText
+        ? { type: "selection" as const, raw: { text: context.selectionText } }
+        : context.srcUrl
+          ? { type: "image" as const, raw: { srcUrl: context.srcUrl } }
+          : context.linkUrl
+            ? { type: "link" as const, raw: { linkUrl: context.linkUrl } }
+            : { type: "selection" as const, raw: { text: "Unknown context" } };
 
       const bug: BugClipboard = {
         title: ai.title,
@@ -154,7 +162,7 @@ export default function DevPanel() {
         steps: ai.steps || [],
         screenshotDataUrl: screenshot,
         createdAt: getFormattedDate(),
-        source: { type: "selection", raw: { text: selectionText } },
+        source: rawSource,
         replayActions,
       };
 
@@ -171,17 +179,21 @@ export default function DevPanel() {
 
   useEffect(() => {
     const messageListener = (msg: any) => {
-      if (msg.action === "TRIGGER_BUG_CREATION_FROM_CONTEXT" && msg.selectionText) {
-        console.log("[BugSense Panel] Received trigger from context menu:", msg.selectionText);
+      if (msg.action === "TRIGGER_BUG_CREATION_FROM_CONTEXT" && msg.selectionText || msg.srcUrl || msg.linkUrl) {
+        console.log("[BugSense Panel] Received trigger from context menu:", msg);
         console.log("[BugSense Panel] Creating new UI bug from selection...");
-        createBugFromSelection(msg.selectionText);
+        createBugFromContext({
+          selectionText: msg.selectionText,
+          srcUrl: msg.srcUrl,
+          linkUrl: msg.linkUrl
+        });
       }
     };
     chrome.runtime.onMessage.addListener(messageListener);
     return () => {
       chrome.runtime.onMessage.removeListener(messageListener);
     };
-  }, [createBugFromSelection]);
+  }, [createBugFromContext]);
 
   async function insertIntoSheet(bug: BugClipboard) {
     try {

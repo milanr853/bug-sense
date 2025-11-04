@@ -104,21 +104,29 @@ chrome.runtime.onInstalled.addListener(() => {
     id: "BUGSENSE_CREATE_BUG_FROM_CONSOLE",
     title: "Bug Sense: Create bug report from this error",
     // This is the key: it shows the menu ONLY in devtools AND when text is selected
-    contexts: ["selection"]
+    contexts: ["selection", "image", "link", "editable"]
   });
   // --- End of new block ---
   console.log("[BugSense] Background installed. Context menu created.");
 });
-// 2. Listen for a click on the menu item we just created
+// 2. Replace your onClicked listener with this new one
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "BUGSENSE_CREATE_BUG_FROM_CONSOLE" && info.selectionText) {
-    console.log("[BugSense] Context menu clicked, selection:", info.selectionText);
+  if (info.menuItemId === "BUGSENSE_CREATE_BUG_FROM_CONSOLE") {
 
-    // Send a message to the active DevPanel telling it to create a bug
-    chrome.runtime.sendMessage({
-      action: "TRIGGER_BUG_CREATION_FROM_CONTEXT",
-      selectionText: info.selectionText
-    });
+    // ✅ --- THIS LOGIC NOW CHECKS FOR linkUrl ---
+    // We check for any of the data types we care about
+    if (info.selectionText || info.srcUrl || info.linkUrl) {
+      console.log("[BugSense] Context menu clicked.");
+
+      // Send a message with ALL possible properties
+      chrome.runtime.sendMessage({
+        action: "TRIGGER_BUG_CREATION_FROM_CONTEXT",
+        selectionText: info.selectionText, // Will be undefined if not text
+        srcUrl: info.srcUrl,              // Will be undefined if not an image
+        linkUrl: info.linkUrl             // Will be undefined if not a link
+      });
+    }
+    // --- END OF NEW LOGIC ---
   }
 });
 //---------------------------------------------
