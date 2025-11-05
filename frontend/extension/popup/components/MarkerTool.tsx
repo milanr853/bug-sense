@@ -24,15 +24,14 @@ export default function MarkerTool({ image, onClose }: MarkerToolProps) {
     const img = new Image();
     img.src = image;
     img.onload = () => {
-      // use natural pixel dimensions for canvas internal coord space
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
+      // 🔧 draw at the real pixel size of the screenshot
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = img.naturalWidth * dpr;
+      canvas.height = img.naturalHeight * dpr;
+      ctx.scale(dpr, dpr);
+      ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
 
-      // draw image to full res
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      // keep canvas visually responsive to popup width:
+      // Keep visible size responsive in popup
       canvas.style.width = "100%";
       canvas.style.height = "auto";
 
@@ -146,10 +145,33 @@ export default function MarkerTool({ image, onClose }: MarkerToolProps) {
 
   const saveAnnotated = () => {
     if (!canvasRef.current) return;
-    const link = document.createElement("a");
-    link.href = canvasRef.current.toDataURL("image/png");
-    link.download = `bug-sense-annotated-${Date.now()}.png`;
-    link.click();
+
+    const canvas = canvasRef.current;
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          console.error("[BugSense] Failed to create annotated blob");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string;
+          chrome.runtime.sendMessage(
+            { action: "SAVE_ANNOTATED_IMAGE_DATAURL", dataUrl },
+            (resp) => {
+              if (resp?.success) {
+                console.log("[BugSense] Annotated image saved successfully ✅");
+              } else {
+                console.error("[BugSense] MarkerTool background failed:", resp?.error);
+              }
+            }
+          );
+        };
+        reader.readAsDataURL(blob);
+      },
+      "image/jpeg",
+      1.0 // maximum quality
+    );
   };
 
   return (
@@ -181,14 +203,14 @@ export default function MarkerTool({ image, onClose }: MarkerToolProps) {
             onClick={saveAnnotated}
             className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-sm"
           >
-            <IoIosSave  />
+            <IoIosSave />
           </button>
 
           <button title="Close"
             onClick={onClose}
             className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded text-sm"
           >
-            <IoClose  />
+            <IoClose />
           </button>
         </div>
       </div>

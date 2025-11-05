@@ -264,6 +264,49 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 // ==========================================================
+// 🧠 FINAL: SAVE_ANNOTATED_IMAGE_DATAURL (High Quality JPEG)
+// ==========================================================
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.action === "SAVE_ANNOTATED_IMAGE_DATAURL") {
+    try {
+      const { dataUrl } = msg;
+      if (!dataUrl || !dataUrl.startsWith("data:image")) {
+        sendResponse({ success: false, error: "Invalid data URL" });
+        return;
+      }
+
+      // Force proper JPEG extension and MIME
+      const filename = `bug-sense-annotated-${Date.now()}.jpg`;
+      const jpegDataUrl = dataUrl.replace(/^data:image\/[^;]+/, "data:image/jpeg");
+
+      chrome.downloads.download(
+        {
+          url: jpegDataUrl,
+          filename,
+          saveAs: true,
+        },
+        (downloadId) => {
+          if (chrome.runtime.lastError) {
+            console.error("[BugSense] Annotated JPEG download failed:", chrome.runtime.lastError);
+            sendResponse({
+              success: false,
+              error: chrome.runtime.lastError.message || "Download failed",
+            });
+          } else {
+            console.log("[BugSense] Annotated image download started:", downloadId);
+            sendResponse({ success: true });
+          }
+        }
+      );
+    } catch (err) {
+      console.error("[BugSense] SAVE_ANNOTATED_IMAGE_DATAURL failed:", err);
+      sendResponse({ success: false, error: String(err) });
+    }
+
+    return true; // async response
+  }
+});
+
 
 chrome.runtime.onMessage.addListener((msg: any, sender, sendResponse) => {
   (async () => {
