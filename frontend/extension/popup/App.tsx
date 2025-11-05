@@ -54,15 +54,6 @@ export default function App() {
         <GifMaker />
 
         <InstantReplay />
-
-        {/* <button
-          className="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 transition"
-          onClick={() => {
-            // Analyze sheet placeholder
-          }}
-        >
-          🧠 Analyze Sheet
-        </button> */}
       </div>
     </div>
   );

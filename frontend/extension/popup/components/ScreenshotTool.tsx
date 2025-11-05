@@ -1,5 +1,6 @@
 // extension/popup/components/ScreenshotTool.tsx
 import React, { useEffect, useState } from "react";
+import DisplayButton from "../../components/DisplayButton";
 
 export default function ScreenshotTool({
   onAnnotate,
@@ -58,14 +59,7 @@ export default function ScreenshotTool({
 
   return (
     <div className="space-y-2">
-      <button
-        onClick={captureScreenshot}
-        disabled={capturing}
-        className={`w-full ${capturing ? "bg-gray-400" : "bg-blue-500 hover:bg-blue-600"
-          } text-white py-2 rounded-lg`}
-      >
-        {capturing ? "Capturing..." : "📸 Take Screenshot"}
-      </button>
+      <DisplayButton name={capturing ? "Capturing..." : "📸 Take Screenshot"} onClick={() => captureScreenshot()} color="blue" disable={capturing} />
 
       {imageUrl && (
         <div className="mt-3 text-center">

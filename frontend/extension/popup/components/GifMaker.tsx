@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import DisplayButton from "../../components/DisplayButton";
 
 export default function GifMaker() {
   const [gifUrl, setGifUrl] = useState<string | null>(null);
@@ -36,12 +37,7 @@ export default function GifMaker() {
 
   return (
     <div className="space-y-2">
-      <button
-        onClick={openUploader}
-        className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded"
-      >
-        {processing ? "Processing..." : "🔁 Select & Convert Recording"}
-      </button>
+      <DisplayButton name={processing ? "Processing..." : "🔁 Select & Convert Recording"} onClick={() => openUploader()} color="purple" disable={processing} />
 
       {gifUrl && (
         <div>

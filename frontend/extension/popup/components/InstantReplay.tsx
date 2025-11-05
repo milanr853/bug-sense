@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FaDownload, FaPause, FaPlay } from "react-icons/fa";
+import DisplayButton from "../../components/DisplayButton";
 
 /**
  * extension/popup/components/InstantReplay.tsx
@@ -269,13 +270,7 @@ export default function InstantReplay(): JSX.Element {
 
     return (
         <div className="space-y-2">
-            <button
-                onClick={() => setShowReplay(prev => !prev)}
-                className="w-full bg-slate-400 hover:bg-slate-500 text-white py-2 rounded-lg transition"
-                title="Toggle replay preview"
-            >
-                🔁 Instant Visual Replay
-            </button>
+            <DisplayButton name="🔁 Instant Visual Replay" onClick={() => setShowReplay(prev => !prev)} color="slate" title="Toggle replay preview" />
 
             {showReplay && <>
                 <div className="text-sm font-medium text-gray-700 text-center">🔁 Instant Visual Replay</div>

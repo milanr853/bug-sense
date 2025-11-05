@@ -1,5 +1,6 @@
 // RecorderTool.tsx
 import React, { useEffect, useState } from "react";
+import DisplayButton from "../../components/DisplayButton";
 
 /**
  * RecorderTool — simplified popup controller.
@@ -64,18 +65,8 @@ export default function RecorderTool() {
   };
 
   return (
-    <div className="space-y-3 text-center">
-      {/* Start Recording (remains green). When isRecording === true it shows "Processing..." and is disabled. */}
-      <button
-        onClick={startRecording}
-        disabled={isRecording}
-        className={`w-full ${isRecording ? "bg-green-400 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"
-          } text-white py-2 rounded-lg transition`}
-      >
-        {isRecording ? "Processing..." : "🎥 Start Recording"}
-      </button>
-
-      {/* No long red line in main UI anymore — GIF and recording both use "Processing..." on button */}
+    <div className="space-y-2 ">
+      <DisplayButton name={isRecording ? "Processing..." : "🎥 Start Recording"} onClick={() => startRecording()} color="green" disable={isRecording} />
     </div>
   );
 }
