@@ -47,6 +47,7 @@ export default defineConfig({
         duplicateBugDetector: resolve(__dirname, "extension/content/duplicateBugDetector.ts"),
         consoleListener: resolve(__dirname, "extension/content/consoleListener.ts"),
         recorder: resolve(__dirname, "extension/recorder/recorder.html"),
+        replayExport: resolve(__dirname, "extension/replay-export/replay-export.html"),
         // NOTE: Do NOT add devtools HTML here — devtools build is separate
       },
       output: {

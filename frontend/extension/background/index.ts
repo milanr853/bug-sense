@@ -11,6 +11,7 @@ type Msg =
   | { action: "CAPTURE_FRAME" }
   | { action: "TAKE_SCREENSHOT" }
   | { action: "SAVE_ANNOTATED_IMAGE_DATAURL" }
+  | { action: "OPEN_REPLAY_EXPORT_PAGE" }
 
 let mediaRecorder: MediaRecorder | null = null;
 let recordedChunks: BlobPart[] = [];
@@ -693,5 +694,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     });
 
     return true; // Keep the message channel open for the async response
+  }
+});
+
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.action === "OPEN_REPLAY_EXPORT_PAGE") {
+    const url = chrome.runtime.getURL("extension/replay-export/replay-export.html");
+    chrome.tabs.create({ url, active: true });
   }
 });

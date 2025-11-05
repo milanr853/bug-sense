@@ -81,6 +81,7 @@
         "extension/icons/*",
         "extension/uploader/uploader.html",
         "extension/recorder/recorder.html",
+        "extension/replay-export/replay-export.html",
         "extension/devtools/*"
       ],
       "matches": [

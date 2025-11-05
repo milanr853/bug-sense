@@ -76,6 +76,15 @@ export default function InstantReplay(): JSX.Element {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [playing, index, screenshots]);
 
+    // Cleanup video blob URL to prevent memory leaks
+    useEffect(() => {
+        return () => {
+            if (videoUrl) {
+                URL.revokeObjectURL(videoUrl);
+            }
+        };
+    }, [videoUrl]);
+
     function startPlayback() {
         stopPlayback();
         const id = window.setInterval(() => {
@@ -110,165 +119,35 @@ export default function InstantReplay(): JSX.Element {
 
     async function buildVideoAndDownload() {
         setError(null);
-        setVideoUrl(null);
 
         if (!screenshots || screenshots.length === 0) {
             setError("No screenshots available for export.");
             return;
         }
 
-        setIsBuilding(true);
-        setBuildProgress(0);
-
         try {
-            // Prepare ordered frames
-            const frames = screenshots.slice();
+            // save current screenshots in storage (so background can access)
+            await chrome.storage.local.set({ replayExportQueue: screenshots });
 
-            // Compute durations between frames using timestamps
-            const durations: number[] = [];
-            for (let i = 0; i < frames.length - 1; i++) {
-                const dt = Math.max(MIN_FRAME_MS, Math.min(MAX_FRAME_MS, frames[i + 1].timestamp - frames[i].timestamp || DEFAULT_FRAME_INTERVAL_MS));
-                durations.push(dt);
-            }
-            // Last frame duration use default
-            durations.push(DEFAULT_FRAME_INTERVAL_MS);
+            // open export page via background (keeps popup lightweight)
+            chrome.runtime.sendMessage({ action: "OPEN_REPLAY_EXPORT_PAGE" });
 
-            // Load first image to get natural size
-            const firstImg = new Image();
-            firstImg.src = frames[0].screenshot;
-            await firstImg.decode();
-            let targetW = firstImg.naturalWidth || 1280;
-            let targetH = firstImg.naturalHeight || 720;
+            setIsBuilding(true);
+            setBuildProgress(0);
 
-            // cap maximum size to avoid huge memory usage
-            const MAX_W = 1280;
-            if (targetW > MAX_W) {
-                const ratio = MAX_W / targetW;
-                targetW = Math.round(targetW * ratio);
-                targetH = Math.round(targetH * ratio);
-            }
-
-            // create canvas and capture stream
-            const canvas = document.createElement("canvas");
-            canvas.width = targetW;
-            canvas.height = targetH;
-            const ctx = canvas.getContext("2d");
-            if (!ctx) throw new Error("Unable to get canvas context");
-
-            // Try a safe MIME type for Chrome
-            const mimeCandidates = [
-                "video/webm;codecs=vp9",
-                "video/webm;codecs=vp8",
-                "video/webm",
-            ];
-
-            const stream = (canvas as any).captureStream?.(30) as MediaStream;
-            if (!stream) throw new Error("Your browser does not support canvas.captureStream()");
-
-            let recorder: MediaRecorder | null = null;
-            let mimeTypeUsed = "video/webm";
-            for (const m of mimeCandidates) {
-                try {
-                    if (!MediaRecorder.isTypeSupported || MediaRecorder.isTypeSupported(m)) {
-                        recorder = new MediaRecorder(stream, { mimeType: m });
-                        mimeTypeUsed = m;
-                        break;
-                    }
-                } catch (e) {
-                    // try next
-                }
-            }
-
-            // fallback
-            if (!recorder) recorder = new MediaRecorder(stream);
-
-            const chunks: BlobPart[] = [];
-            recorder.ondataavailable = (ev) => {
-                if (ev.data && ev.data.size > 0) chunks.push(ev.data);
-            };
-
-            const stopPromise = new Promise<Blob>((resolve, reject) => {
-                recorder!.onstop = () => {
-                    try {
-                        const blob = new Blob(chunks, { type: mimeTypeUsed });
-                        resolve(blob);
-                    } catch (e) {
-                        reject(e);
-                    }
-                };
-            });
-
-            recorder.start(1000 / 30); // hint interval
-
-            // Draw frames sequentially, waiting for the duration of each frame so recorder captures them
-            for (let i = 0; i < frames.length; i++) {
-                const img = new Image();
-                img.src = frames[i].screenshot;
-                await img.decode();
-
-                // draw scaled to canvas
-                // maintain aspect fit
-                const arCanvas = canvas.width / canvas.height;
-                const arImg = (img.naturalWidth || canvas.width) / (img.naturalHeight || canvas.height);
-                let drawW = canvas.width,
-                    drawH = canvas.height,
-                    offsetX = 0,
-                    offsetY = 0;
-                if (arImg > arCanvas) {
-                    // image is wider
-                    drawW = canvas.width;
-                    drawH = Math.round(canvas.width / arImg);
-                    offsetY = Math.round((canvas.height - drawH) / 2);
-                } else {
-                    drawH = canvas.height;
-                    drawW = Math.round(canvas.height * arImg);
-                    offsetX = Math.round((canvas.width - drawW) / 2);
-                }
-
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                // optional black background
-                ctx.fillStyle = "#000";
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
-
-                // progress
-                setBuildProgress(Math.round(((i + 1) / frames.length) * 100));
-
-                // wait for duration
-                const waitMs = Math.max(MIN_FRAME_MS, Math.min(MAX_FRAME_MS, durations[i] || DEFAULT_FRAME_INTERVAL_MS));
-                await new Promise((r) => setTimeout(r, waitMs));
-            }
-
-            // stop recorder and get blob
-            recorder.stop();
-            const recordedBlob = await stopPromise;
-
-            // create object URL and prompt download
-            const url = URL.createObjectURL(recordedBlob);
-            setVideoUrl(url);
-
-            // Auto-download
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `bug-sense-replay-${Date.now()}.webm`;
-            a.click();
-
-            setBuildProgress(100);
-            setIsBuilding(false);
-        } catch (err: any) {
-            console.error("buildVideoAndDownload error:", err);
-            setError(String(err?.message || err));
-            setIsBuilding(false);
+            // show a short message
+            setTimeout(() => {
+                setIsBuilding(false);
+                alert("Replay export started in a separate tab — you can close this popup safely.");
+            }, 1000);
+        } catch (err) {
+            console.error("Failed to start replay export:", err);
+            setError(String(err));
         }
     }
 
-    // function downloadPreview() {
-    //     if (!videoUrl) return;
-    //     const a = document.createElement("a");
-    //     a.href = videoUrl;
-    //     a.download = `bug-sense-replay-${Date.now()}.webm`;
-    //     a.click();
-    // }
+
+
 
     return (
         <div className="space-y-3">
