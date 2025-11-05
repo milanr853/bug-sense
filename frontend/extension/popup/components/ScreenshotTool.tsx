@@ -1,31 +1,59 @@
-import React, { useState } from "react";
+// extension/popup/components/ScreenshotTool.tsx
+import React, { useEffect, useState } from "react";
 
-export default function ScreenshotTool({ onAnnotate }: { onAnnotate?: (img: string) => void }) {
+export default function ScreenshotTool({
+  onAnnotate,
+}: {
+  onAnnotate?: (img: string) => void;
+}) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
+  const [fullKey, setFullKey] = useState<string | null>(null);
+  const [filename, setFilename] = useState<string | null>(null);
 
-  const captureScreenshot = async () => {
-    try {
-      setCapturing(true);
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab.id) throw new Error("No active tab found");
+  useEffect(() => {
+    return () => {
+      if (imageUrl && imageUrl.startsWith("blob:")) URL.revokeObjectURL(imageUrl);
+    };
+  }, [imageUrl]);
 
-      // Capture the current tab
-      const image = await chrome.tabs.captureVisibleTab(tab.windowId!, { format: "png" });
-      setImageUrl(image);
+  const captureScreenshot = () => {
+    if (capturing) return;
+    setCapturing(true);
+
+    chrome.runtime.sendMessage({ action: "TAKE_SCREENSHOT" }, (resp) => {
+      if (chrome.runtime.lastError) {
+        console.error("Screenshot message failed:", chrome.runtime.lastError);
+        setCapturing(false);
+        return;
+      }
+
+      if (resp?.success) {
+        setImageUrl(resp.preview);
+        setFullKey(resp.fullKey);
+        setFilename(resp.filename || null);
+        console.log("[BugSense] Screenshot preview ready ✅");
+      } else {
+        console.error("Screenshot failed:", resp?.error);
+      }
+
       setCapturing(false);
-    } catch (err) {
-      console.error("Screenshot failed:", err);
-      setCapturing(false);
-    }
+    });
   };
 
   const downloadScreenshot = () => {
-    if (!imageUrl) return;
-    const a = document.createElement("a");
-    a.href = imageUrl;
-    a.download = `bug-sense-screenshot-${Date.now()}.png`;
-    a.click();
+    if (!fullKey) return;
+    chrome.runtime.sendMessage(
+      { action: "DOWNLOAD_FULL_SCREENSHOT", fullKey },
+      (resp) => {
+        if (chrome.runtime.lastError) {
+          console.error("Download message failed:", chrome.runtime.lastError);
+          return;
+        }
+        if (!resp?.success) console.error("Download failed:", resp?.error);
+        else console.log("Download started:", resp.downloadId);
+      }
+    );
   };
 
   return (
@@ -51,26 +79,18 @@ export default function ScreenshotTool({ onAnnotate }: { onAnnotate?: (img: stri
               onClick={downloadScreenshot}
               className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded"
             >
-              💾 Download
+              💾 Download Full
             </button>
             <button
-              onClick={
-                //   () => {
-                //   chrome.runtime.sendMessage({
-                //     action: "OPEN_MARKER_TOOL",
-                //     data: imageUrl,
-                //   });
-                // }
-                () => onAnnotate?.(imageUrl)
-              }
+              onClick={() => onAnnotate?.(imageUrl)}
               className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded"
             >
               ✏️ Annotate
             </button>
           </div>
+          {filename && <div className="text-xs text-gray-500 mt-1">{filename}</div>}
         </div>
       )}
     </div>
   );
 }
-

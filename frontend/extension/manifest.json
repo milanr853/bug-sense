@@ -4,7 +4,7 @@
   "description": "AI-powered Chrome extension for testers to capture, analyze, and report bugs efficiently.",
   "version": "1.0.0",
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:3000; img-src 'self' data:; default-src 'self';"
+    "extension_pages": "script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:3000 data: blob:; img-src 'self' data: blob:; default-src 'self';"
   },
   "permissions": [
     "identity",
@@ -14,7 +14,8 @@
     "scripting",
     "contextMenus",
     "tabCapture",
-    "webNavigation"
+    "webNavigation",
+    "downloads"
   ],
   "host_permissions": [
     "https://*/*",

@@ -8,7 +8,8 @@ type Msg =
   | { action: "STOP_RECORDING" }
   | { action: "OPEN_GIF_UPLOADER" }
   | { action: "OPEN_RECORDER_WINDOW" }
-  | { action: "CAPTURE_FRAME" };
+  | { action: "CAPTURE_FRAME" }
+  | { action: "TAKE_SCREENSHOT" }
 
 let mediaRecorder: MediaRecorder | null = null;
 let recordedChunks: BlobPart[] = [];
@@ -130,6 +131,139 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 //---------------------------------------------
+
+// ==========================================================
+// 🆕 BUGSENSE SCREENSHOT HANDLER (Non-blocking + Full Res + Preview)
+// ==========================================================
+
+type FullImageRecord = {
+  dataUrl: string;      // full screenshot (dataURL)
+  filename: string;     // download filename
+  createdAt: number;    // timestamp for auto cleanup
+};
+
+const FULL_IMAGE_CACHE = new Map<string, FullImageRecord>();
+const FULL_IMAGE_TTL = 1000 * 60 * 5; // 5 minutes
+
+function scheduleScreenshotCleanup(key: string, delay = FULL_IMAGE_TTL) {
+  setTimeout(() => {
+    FULL_IMAGE_CACHE.delete(key);
+  }, delay);
+}
+
+async function createPreviewDataUrl(blob: Blob, maxW = 800, maxH = 600, quality = 0.7): Promise<string> {
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const scale = Math.min(1, Math.min(maxW / bitmap.width, maxH / bitmap.height));
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+
+    const canvas = new OffscreenCanvas(w, h);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Failed to create OffscreenCanvas context");
+
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    const previewBlob = await (canvas as any).convertToBlob({ type: "image/jpeg", quality });
+    bitmap.close();
+
+    const reader = new FileReader();
+    return await new Promise((resolve, reject) => {
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(previewBlob);
+    });
+  } catch (err) {
+    console.warn("[BugSense] Preview downscale failed:", err);
+    return "";
+  }
+}
+
+// 🧠 Screenshot message handler
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.action === "TAKE_SCREENSHOT") {
+    console.log("[BugSense Background] TAKE_SCREENSHOT triggered 🖼️");
+
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      const tab = tabs?.[0];
+      if (!tab || !tab.windowId) {
+        sendResponse({ success: false, error: "No active tab" });
+        return;
+      }
+
+      chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 85 }, async (dataUrl) => {
+        if (chrome.runtime.lastError) {
+          sendResponse({
+            success: false,
+            error: chrome.runtime.lastError.message || "captureVisibleTab failed",
+          });
+          return;
+        }
+
+        if (!dataUrl) {
+          sendResponse({ success: false, error: "Empty screenshot" });
+          return;
+        }
+
+        try {
+          // Full image storage
+          const filename = `bug-sense-screenshot-${Date.now()}.jpg`;
+          const key = `bugSense_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+          FULL_IMAGE_CACHE.set(key, { dataUrl, filename, createdAt: Date.now() });
+          scheduleScreenshotCleanup(key);
+
+          // Generate small preview
+          const blob = await (await fetch(dataUrl)).blob();
+          let previewUrl = dataUrl;
+          try {
+            const preview = await createPreviewDataUrl(blob, 600, 400, 0.7);
+            if (preview) previewUrl = preview;
+          } catch { }
+
+          sendResponse({
+            success: true,
+            preview: previewUrl,
+            fullKey: key,
+            filename,
+          });
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) });
+        }
+      });
+    });
+
+    return true; // keep sendResponse async
+  }
+
+  if (msg?.action === "DOWNLOAD_FULL_SCREENSHOT" && msg.fullKey) {
+    const entry = FULL_IMAGE_CACHE.get(msg.fullKey);
+    if (!entry) {
+      sendResponse({ success: false, error: "Screenshot expired or missing" });
+      return;
+    }
+
+    chrome.downloads.download(
+      {
+        url: entry.dataUrl,
+        filename: entry.filename,
+        saveAs: true,
+      },
+      (id) => {
+        if (chrome.runtime.lastError) {
+          sendResponse({
+            success: false,
+            error: chrome.runtime.lastError.message || "Download failed",
+          });
+        } else {
+          sendResponse({ success: true, downloadId: id });
+        }
+        FULL_IMAGE_CACHE.delete(msg.fullKey);
+      }
+    );
+
+    return true; // async
+  }
+});
+// ==========================================================
 
 chrome.runtime.onMessage.addListener((msg: any, sender, sendResponse) => {
   (async () => {
