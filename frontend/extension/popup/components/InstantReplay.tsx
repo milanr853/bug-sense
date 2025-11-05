@@ -269,11 +269,11 @@ export default function InstantReplay(): JSX.Element {
     // }
 
     return (
-        <div className="space-y-2">
-            <DisplayButton name="🔁 Instant Visual Replay" onClick={() => setShowReplay(prev => !prev)} color="slate" title="Toggle replay preview" />
+        <div className="space-y-3">
+            <DisplayButton name="🔁 Instant Visual Replay" onClick={() => setShowReplay(prev => !prev)} color="dark" title="Toggle replay preview" />
 
             {showReplay && <>
-                <div className="text-sm font-medium text-gray-700 text-center">🔁 Instant Visual Replay</div>
+                <div className="text-sm font-medium text-gray-400 text-center">Instant Visual Replay</div>
 
                 {screenshots && screenshots.length > 0 ? (
                     <div className="space-y-2">
@@ -330,7 +330,7 @@ export default function InstantReplay(): JSX.Element {
                                     )}
                                 </button>
 
-                                <div className="text-xs text-gray-500 text-right">
+                                <div className="text-xs text-gray-400 text-right">
                                     {index + 1}/{screenshots.length} • <br />
                                     {new Date(screenshots[index].timestamp).toLocaleTimeString()}
                                 </div>
@@ -362,16 +362,16 @@ export default function InstantReplay(): JSX.Element {
                     <div className="text-left text-sm max-h-48 overflow-auto">
                         {actions.slice().reverse().slice(0, 30).map((a, idx) => (
                             <div key={idx} className="py-1 border-b border-gray-100">
-                                <div className="text-xs text-gray-500">{new Date(a.timestamp).toLocaleTimeString()}</div>
+                                <div className="text-xs text-gray-400">{new Date(a.timestamp).toLocaleTimeString()}</div>
                                 <div className="text-sm">
-                                    <strong>{String(a.type).toUpperCase()}</strong> — <span className="text-gray-700">{JSON.stringify(a.details)}</span>
+                                    <strong>{String(a.type).toUpperCase()}</strong> — <span className="text-gray-400">{JSON.stringify(a.details)}</span>
                                 </div>
                             </div>
                         ))}
                     </div>
                 )}
 
-                <div className="text-xs text-gray-500 text-center">Shows visual replay (latest ~30-60s snapshots). Export to WebM video.</div>
+                <div className="text-xs text-gray-400 text-center">Shows visual replay (latest ~30-60s snapshots). Export to WebM video.</div>
             </>}
         </div>
     );

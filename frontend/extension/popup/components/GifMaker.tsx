@@ -36,8 +36,8 @@ export default function GifMaker() {
   };
 
   return (
-    <div className="space-y-2">
-      <DisplayButton name={processing ? "Processing..." : "🔁 Select & Convert Recording"} onClick={() => openUploader()} color="purple" disable={processing} />
+    <div className="space-y-3">
+      <DisplayButton name={processing ? "Processing..." : "🔁 Select & Convert Recording"} onClick={() => openUploader()} color="dark" disable={processing} />
 
       {gifUrl && (
         <div>

@@ -18,8 +18,8 @@ export default function App() {
   const Header = () => (
     <div className="flex items-center justify-between">
       <div>
-        <h2 className="text-lg font-semibold text-gray-800">Bug Sense</h2>
-        <div className="text-xs text-gray-500">v1.0.0</div>
+        <h2 className="text-lg font-semibold text-gray-400">Bug Sense</h2>
+        <div className="text-xs text-gray-400">v1.0.0</div>
       </div>
       <div />
     </div>
@@ -43,7 +43,7 @@ export default function App() {
   }
 
   return (
-    <div className="w-[320px] p-3 bg-white rounded-lg shadow-lg">
+    <div className="w-[320px] p-3 rounded-lg shadow-lg bg-blue-950">
       <Header />
 
       <div className="mt-3 space-y-3">

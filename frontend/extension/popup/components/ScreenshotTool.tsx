@@ -58,8 +58,8 @@ export default function ScreenshotTool({
   };
 
   return (
-    <div className="space-y-2">
-      <DisplayButton name={capturing ? "Capturing..." : "📸 Take Screenshot"} onClick={() => captureScreenshot()} color="blue" disable={capturing} />
+    <div className="space-y-3">
+      <DisplayButton name={capturing ? "Capturing..." : "📸 Take Screenshot"} onClick={() => captureScreenshot()} color="dark" disable={capturing} />
 
       {imageUrl && (
         <div className="mt-3 text-center">

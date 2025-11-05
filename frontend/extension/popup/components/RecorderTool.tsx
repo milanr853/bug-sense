@@ -65,8 +65,8 @@ export default function RecorderTool() {
   };
 
   return (
-    <div className="space-y-2 ">
-      <DisplayButton name={isRecording ? "Processing..." : "🎥 Start Recording"} onClick={() => startRecording()} color="green" disable={isRecording} />
+    <div className="space-y-3 ">
+      <DisplayButton name={isRecording ? "Processing..." : "🎥 Start Recording"} onClick={() => startRecording()} color="dark" disable={isRecording} />
     </div>
   );
 }
