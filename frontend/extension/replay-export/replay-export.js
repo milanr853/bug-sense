@@ -34,7 +34,7 @@ async function main() {
         : "video/webm";
     const recorder = new MediaRecorder(stream, {
         mimeType,
-        videoBitsPerSecond: 3_000_000,
+        videoBitsPerSecond: 8_000_000, // boost quality
     });
 
     const chunks = [];
@@ -61,7 +61,7 @@ async function main() {
             bmp.close();
             prog.value = ((i + 1) / frames.length) * 100;
             status.textContent = `Frame ${i + 1}/${frames.length}`;
-            await new Promise((r) => setTimeout(r, 80)); // ~12 fps pacing
+            await new Promise((r) => setTimeout(r, 750)); // Wait 750 ms between frames
         } catch (e) {
             console.warn("Frame failed:", e);
         }
