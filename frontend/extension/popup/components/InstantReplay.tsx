@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { FaDownload, FaPause, FaPlay } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaDownload, FaPause, FaPlay } from "react-icons/fa";
 import DisplayButton from "../../components/DisplayButton";
+import { LuStepBack, LuStepForward } from "react-icons/lu";
+import { FaBackwardStep, FaForwardStep } from "react-icons/fa6";
 
 /**
  * extension/popup/components/InstantReplay.tsx
@@ -289,12 +291,12 @@ export default function InstantReplay(): JSX.Element {
                                     className="flex items-center justify-center w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-full transition"
                                     title="Previous Frame"
                                 >
-                                    ◀
+                                    <FaBackwardStep size={16} className="text-gray-500" />
                                 </button>
 
                                 <button
                                     onClick={togglePlay}
-                                    className="flex items-center justify-center w-8 h-8 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-sm transition"
+                                    className="flex items-center justify-center w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-sm transition"
                                     title={playing ? "Pause" : "Play"}
                                 >
                                     {playing ? <FaPause size={12} /> : <FaPlay size={15} />}
@@ -305,7 +307,7 @@ export default function InstantReplay(): JSX.Element {
                                     className="flex items-center justify-center w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-full transition"
                                     title="Next Frame"
                                 >
-                                    ▶
+                                    <FaForwardStep size={16} className="text-gray-500" />
                                 </button>
                             </div>
 
