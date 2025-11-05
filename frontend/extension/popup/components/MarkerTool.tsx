@@ -24,14 +24,15 @@ export default function MarkerTool({ image, onClose }: MarkerToolProps) {
     const img = new Image();
     img.src = image;
     img.onload = () => {
-      // 🔧 draw at the real pixel size of the screenshot
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = img.naturalWidth * dpr;
-      canvas.height = img.naturalHeight * dpr;
-      ctx.scale(dpr, dpr);
+      // ✅ FIX: Set canvas to the exact 1:1 pixel size of the image.
+      // This stops any blurry scaling.
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+
+      // Draw image 1:1
       ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
 
-      // Keep visible size responsive in popup
+      // Keep visible size responsive in popup (this is correct)
       canvas.style.width = "100%";
       canvas.style.height = "auto";
 

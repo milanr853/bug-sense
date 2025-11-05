@@ -10,6 +10,7 @@ type Msg =
   | { action: "OPEN_RECORDER_WINDOW" }
   | { action: "CAPTURE_FRAME" }
   | { action: "TAKE_SCREENSHOT" }
+  | { action: "SAVE_ANNOTATED_IMAGE_DATAURL" }
 
 let mediaRecorder: MediaRecorder | null = null;
 let recordedChunks: BlobPart[] = [];
