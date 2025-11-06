@@ -76,15 +76,28 @@ export default function DevPanel() {
     });
   }
 
-  const captureScreenshot = useCallback(async () => {
+  const captureScreenshot = useCallback(async (mode: "full" | "selective" = "full") => {
+    if (mode === "selective") {
+      return new Promise<string | null>((resolve) => {
+        const listener = (msg: any) => {
+          if (msg.action === "TRIGGER_BUG_CREATION_FROM_CONTEXT" && msg.mode === "selective" && msg.screenshot) {
+            chrome.runtime.onMessage.removeListener(listener);
+            resolve(msg.screenshot);
+          }
+        };
+        chrome.runtime.onMessage.addListener(listener);
+      });
+    }
+
+    // Default full-screen capture
     return new Promise<string | null>((resolve) => {
       chrome.runtime.sendMessage({ action: "CAPTURE_FRAME" }, (resp) => {
         if (chrome.runtime.lastError) {
           console.warn("CAPTURE_FRAME runtime error:", chrome.runtime.lastError);
           resolve(null);
-          return;
+        } else {
+          resolve(resp?.screenshot || null);
         }
-        resolve(resp?.screenshot || null);
       });
     });
   }, []);
@@ -233,21 +246,54 @@ export default function DevPanel() {
 
   useEffect(() => {
     const messageListener = (msg: any) => {
-      if (msg.action === "TRIGGER_BUG_CREATION_FROM_CONTEXT" && msg.selectionText || msg.srcUrl || msg.linkUrl) {
-        console.log("[BugSense Panel] Received trigger from context menu:", msg);
-        console.log("[BugSense Panel] Creating new UI bug from selection...");
+      // For existing context menu trigger
+      if (
+        msg.action === "TRIGGER_BUG_CREATION_FROM_CONTEXT" &&
+        (msg.selectionText || msg.srcUrl || msg.linkUrl)
+      ) {
         createBugFromContext({
           selectionText: msg.selectionText,
           srcUrl: msg.srcUrl,
-          linkUrl: msg.linkUrl
+          linkUrl: msg.linkUrl,
         });
       }
+
+      // 🧩 NEW: Handle selective screenshot trigger
+      if (msg.action === "TRIGGER_BUG_CREATION_FROM_CONTEXT" && msg.mode === "selective" && msg.screenshot) {
+        (async () => {
+          setMessage("Capturing selected area...");
+          const replayActions = await getReplayActions();
+          const extraDetails = await promptForExtraDetails();
+
+          setMessage("Analyzing selective screenshot with BugSense AI...");
+
+          const ai = await callAIForBug({ extraDetails }, msg.screenshot, replayActions);
+
+          const bug: BugClipboard = {
+            title: ai.title,
+            description: ai.description,
+            steps: ai.steps || [],
+            screenshotDataUrl: msg.screenshot,
+            createdAt: getFormattedDate(),
+            source: { type: "selection", raw: {} },
+            replayActions,
+          };
+
+          await new Promise((res) =>
+            chrome.storage.local.set({ bugClipboard: bug }, () => res(true))
+          );
+
+          setMessage("Selective area bug captured ✅");
+          setSuccessBanner(true);
+          setTimeout(() => setSuccessBanner(false), 3000);
+        })();
+      }
     };
+
     chrome.runtime.onMessage.addListener(messageListener);
-    return () => {
-      chrome.runtime.onMessage.removeListener(messageListener);
-    };
-  }, [createBugFromContext]);
+    return () => chrome.runtime.onMessage.removeListener(messageListener);
+  }, [createBugFromContext, getReplayActions, callAIForBug]);
+
 
   async function insertIntoSheet(bug: BugClipboard) {
     try {

@@ -56,7 +56,8 @@
       ],
       "js": [
         "extension/content/replayListener.js",
-        "extension/content/consoleListener.js"
+        "extension/content/consoleListener.js",
+        "extension/content/selectionOverlay.js"
       ],
       "run_at": "document_idle"
     },

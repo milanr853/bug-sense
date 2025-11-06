@@ -12,11 +12,19 @@ type Msg =
   | { action: "TAKE_SCREENSHOT" }
   | { action: "SAVE_ANNOTATED_IMAGE_DATAURL" }
   | { action: "OPEN_REPLAY_EXPORT_PAGE" }
+  | { action: "HIDE_OVERLAY_AND_CAPTURE" };
 
 let mediaRecorder: MediaRecorder | null = null;
 let recordedChunks: BlobPart[] = [];
 let activeStream: MediaStream | null = null;
 const lastSavedUrlKey = "recordedVideo";
+
+// Safety listener to silence "async channel closed" warnings
+// This acts as a safety net for any message that truly never calls sendResponse.
+// It doesn't replace proper fixes, but prevents random console spam while you fix remaining listeners.
+chrome.runtime.onMessage.addListener(() => {
+  // Intentionally no-op.
+});
 
 function setRecordingFlag(on: boolean) {
   try {
@@ -97,39 +105,80 @@ function tryTabCapture(): Promise<MediaStream | null> {
 
 console.log("[BugSense Background] Service worker active ✅");
 
-
 //---------------------------------------------
-// extension/background/index.ts
-// 1. Create the context menu when the extension is installed
 chrome.runtime.onInstalled.addListener(() => {
-  // --- This is the new block to add ---
+  // Create parent menu
   chrome.contextMenus.create({
-    id: "BUGSENSE_CREATE_BUG_FROM_CONSOLE",
-    title: "Bug Sense: Create bug report from this error",
-    // This is the key: it shows the menu ONLY in devtools AND when text is selected
-    contexts: ["selection", "image", "link", "editable"]
+    id: "BUGSENSE_MAIN_MENU",
+    title: "Bug Sense",
+    contexts: ["all"],
   });
-  // --- End of new block ---
-  console.log("[BugSense] Background installed. Context menu created.");
+  // Add two submenus
+  chrome.contextMenus.create({
+    id: "BUGSENSE_FULL_SCREENSHOT",
+    parentId: "BUGSENSE_MAIN_MENU",
+    title: "Create bug report (Full screen)",
+    contexts: ["all"],
+  });
+  chrome.contextMenus.create({
+    id: "BUGSENSE_SELECTIVE_SCREENSHOT",
+    parentId: "BUGSENSE_MAIN_MENU",
+    title: "Create bug report (Select area)",
+    contexts: ["all"],
+  });
+  console.log("[BugSense] Background installed. Context menu created ✅");
 });
+
 // 2. Replace your onClicked listener with this new one
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "BUGSENSE_CREATE_BUG_FROM_CONSOLE") {
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (!tab?.id) return;
 
-    // ✅ --- THIS LOGIC NOW CHECKS FOR linkUrl ---
-    // We check for any of the data types we care about
-    if (info.selectionText || info.srcUrl || info.linkUrl) {
-      console.log("[BugSense] Context menu clicked.");
+  if (info.menuItemId === "BUGSENSE_FULL_SCREENSHOT") {
+    chrome.runtime.sendMessage({
+      action: "TRIGGER_BUG_CREATION_FROM_CONTEXT",
+      mode: "full",
+      selectionText: info.selectionText,
+      srcUrl: info.srcUrl,
+      linkUrl: info.linkUrl,
+    });
+  }
 
-      // Send a message with ALL possible properties
-      chrome.runtime.sendMessage({
-        action: "TRIGGER_BUG_CREATION_FROM_CONTEXT",
-        selectionText: info.selectionText, // Will be undefined if not text
-        srcUrl: info.srcUrl,              // Will be undefined if not an image
-        linkUrl: info.linkUrl             // Will be undefined if not a link
+  if (info.menuItemId === "BUGSENSE_SELECTIVE_SCREENSHOT") {
+    // Inject selectionOverlay.js only once per page (guard in the page avoids duplicate listeners)
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          // Run in page context:
+          // If already injected, mark won't re-inject
+          // NOTE: window is page's window object (this function serializes into the page)
+          // __bugSenseOverlayInjected is a page-global guard.
+          if ((window as any).__bugSenseOverlayInjected) return;
+          (window as any).__bugSenseOverlayInjected = true;
+
+          // Create a script tag that loads extension file (this avoids multiple copies of same content script
+          // being registered by the extension engine)
+          const s = document.createElement("script");
+          s.src = chrome.runtime.getURL("extension/content/selectionOverlay.js");
+          s.async = true;
+          document.documentElement.appendChild(s);
+        },
       });
+    } catch (err) {
+      // If programmatic injection fails, fallback to injecting via files (best-effort)
+      console.warn("[BugSense] programmatic injection failed, falling back to file injection:", err);
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ["extension/content/selectionOverlay.js"],
+        });
+      } catch (err2) {
+        console.warn("[BugSense] fallback injection also failed:", err2);
+      }
     }
-    // --- END OF NEW LOGIC ---
+
+    // Trigger the overlay to start selection (content script listens for this message)
+    chrome.tabs.sendMessage(tab.id, { action: "START_SELECTIVE_CAPTURE" });
   }
 });
 //---------------------------------------------
@@ -180,87 +229,95 @@ async function createPreviewDataUrl(blob: Blob, maxW = 800, maxH = 600, quality 
   }
 }
 
-// 🧠 Screenshot message handler
+// 🧠 TAKE_SCREENSHOT & DOWNLOAD_FULL_SCREENSHOT handler
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.action === "TAKE_SCREENSHOT") {
-    console.log("[BugSense Background] TAKE_SCREENSHOT triggered 🖼️");
+    try {
+      console.log("[BugSense Background] TAKE_SCREENSHOT triggered 🖼️");
 
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      const tab = tabs?.[0];
-      if (!tab || !tab.windowId) {
-        sendResponse({ success: false, error: "No active tab" });
-        return;
-      }
-
-      chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 85 }, async (dataUrl) => {
-        if (chrome.runtime.lastError) {
-          sendResponse({
-            success: false,
-            error: chrome.runtime.lastError.message || "captureVisibleTab failed",
-          });
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+        const tab = tabs?.[0];
+        if (!tab || !tab.windowId) {
+          sendResponse({ success: false, error: "No active tab" });
           return;
         }
 
-        if (!dataUrl) {
-          sendResponse({ success: false, error: "Empty screenshot" });
-          return;
-        }
+        chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 85 }, async (dataUrl) => {
+          if (chrome.runtime.lastError) {
+            sendResponse({
+              success: false,
+              error: chrome.runtime.lastError.message || "captureVisibleTab failed",
+            });
+            return;
+          }
 
-        try {
-          // Full image storage
-          const filename = `bug-sense-screenshot-${Date.now()}.jpg`;
-          const key = `bugSense_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-          FULL_IMAGE_CACHE.set(key, { dataUrl, filename, createdAt: Date.now() });
-          scheduleScreenshotCleanup(key);
+          if (!dataUrl) {
+            sendResponse({ success: false, error: "Empty screenshot" });
+            return;
+          }
 
-          // Generate small preview
-          const blob = await (await fetch(dataUrl)).blob();
-          let previewUrl = dataUrl;
           try {
-            const preview = await createPreviewDataUrl(blob, 600, 400, 0.7);
-            if (preview) previewUrl = preview;
-          } catch { }
+            // Full image storage
+            const filename = `bug-sense-screenshot-${Date.now()}.jpg`;
+            const key = `bugSense_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            FULL_IMAGE_CACHE.set(key, { dataUrl, filename, createdAt: Date.now() });
+            scheduleScreenshotCleanup(key);
 
-          sendResponse({
-            success: true,
-            preview: previewUrl,
-            fullKey: key,
-            filename,
-          });
-        } catch (err) {
-          sendResponse({ success: false, error: String(err) });
-        }
+            // Generate small preview
+            const blob = await (await fetch(dataUrl)).blob();
+            let previewUrl = dataUrl;
+            try {
+              const preview = await createPreviewDataUrl(blob, 600, 400, 0.7);
+              if (preview) previewUrl = preview;
+            } catch { }
+
+            sendResponse({
+              success: true,
+              preview: previewUrl,
+              fullKey: key,
+              filename,
+            });
+          } catch (err) {
+            sendResponse({ success: false, error: String(err) });
+          }
+        });
       });
-    });
+    } catch (e) {
+      sendResponse({ success: false, error: String(e) });
+    }
 
     return true; // keep sendResponse async
   }
 
   if (msg?.action === "DOWNLOAD_FULL_SCREENSHOT" && msg.fullKey) {
-    const entry = FULL_IMAGE_CACHE.get(msg.fullKey);
-    if (!entry) {
-      sendResponse({ success: false, error: "Screenshot expired or missing" });
-      return;
-    }
-
-    chrome.downloads.download(
-      {
-        url: entry.dataUrl,
-        filename: entry.filename,
-        saveAs: true,
-      },
-      (id) => {
-        if (chrome.runtime.lastError) {
-          sendResponse({
-            success: false,
-            error: chrome.runtime.lastError.message || "Download failed",
-          });
-        } else {
-          sendResponse({ success: true, downloadId: id });
-        }
-        FULL_IMAGE_CACHE.delete(msg.fullKey);
+    try {
+      const entry = FULL_IMAGE_CACHE.get(msg.fullKey);
+      if (!entry) {
+        sendResponse({ success: false, error: "Screenshot expired or missing" });
+        return;
       }
-    );
+
+      chrome.downloads.download(
+        {
+          url: entry.dataUrl,
+          filename: entry.filename,
+          saveAs: true,
+        },
+        (id) => {
+          if (chrome.runtime.lastError) {
+            sendResponse({
+              success: false,
+              error: chrome.runtime.lastError.message || "Download failed",
+            });
+          } else {
+            sendResponse({ success: true, downloadId: id });
+          }
+          FULL_IMAGE_CACHE.delete(msg.fullKey);
+        }
+      );
+    } catch (e) {
+      sendResponse({ success: false, error: String(e) });
+    }
 
     return true; // async
   }
@@ -309,10 +366,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
-
+// ---------- Recording & misc handler (single big listener) ----------
 chrome.runtime.onMessage.addListener((msg: any, sender, sendResponse) => {
+  // Wrap the handler logic in an async IIFE so we can await and always call sendResponse.
   (async () => {
     try {
+      if (!msg || !msg.action) {
+        // nothing to do
+        return;
+      }
+
       if (msg.action === "START_RECORDING") {
         console.log("Background: START_RECORDING received");
 
@@ -400,7 +463,7 @@ chrome.runtime.onMessage.addListener((msg: any, sender, sendResponse) => {
 
               // capture as JPEG (quality to keep size reasonable)
               try {
-                const imgData = chrome.tabs.captureVisibleTab(winId, { format: "jpeg", quality: 60 }, (dataUrl) => {
+                chrome.tabs.captureVisibleTab(winId, { format: "jpeg", quality: 60 }, (dataUrl) => {
                   if (chrome.runtime.lastError) {
                     console.warn("captureVisibleTab runtime error:", chrome.runtime.lastError);
                     sendResponse({ success: false, error: String(chrome.runtime.lastError.message || chrome.runtime.lastError) });
@@ -429,44 +492,45 @@ chrome.runtime.onMessage.addListener((msg: any, sender, sendResponse) => {
       }
 
       // ===== APPEND SHEET ROW =====
+      // Replace callback-style chrome.identity.getAuthToken with a Promise wrapper so we always sendResponse
       if (msg.action === "APPEND_SHEET_ROW") {
         const { sheetId, range, row } = msg;
-        (async () => {
-          try {
-            chrome.identity.getAuthToken({ interactive: true }, async (token) => {
-              if (chrome.runtime.lastError || !token) {
-                sendResponse?.({ success: false, error: chrome.runtime.lastError });
-                return;
-              }
+        try {
+          const token = await new Promise<string>((resolve, reject) => {
+            try {
+              chrome.identity.getAuthToken({ interactive: true }, (t: any) => {
+                if (chrome.runtime.lastError || !t) reject(chrome.runtime.lastError || new Error("No token"));
+                else resolve(t);
+              });
+            } catch (e) {
+              reject(e);
+            }
+          });
 
-              const resp = await fetch(
-                `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(
-                  range
-                )}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
-                {
-                  method: "POST",
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({ values: [row] }),
-                }
-              );
+          const resp = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ values: [row] }),
+            }
+          );
 
-              if (!resp.ok) {
-                const j = await resp.json().catch(() => null);
-                sendResponse?.({ success: false, error: j || resp.statusText });
-                return;
-              }
-
-              const j = await resp.json();
-              sendResponse?.({ success: true, result: j });
-            });
-          } catch (err) {
-            sendResponse?.({ success: false, error: String(err) });
+          if (!resp.ok) {
+            const j = await resp.json().catch(() => null);
+            sendResponse({ success: false, error: j || resp.statusText });
+            return;
           }
-        })();
-        return true; // keep message channel open
+
+          const j = await resp.json();
+          sendResponse({ success: true, result: j });
+        } catch (err) {
+          sendResponse({ success: false, error: String(err) });
+        }
+        return true; // keep message channel open for async response
       }
 
     } catch (outer) {
@@ -477,7 +541,7 @@ chrome.runtime.onMessage.addListener((msg: any, sender, sendResponse) => {
     }
   })();
 
-  // indicate we'll call sendResponse asynchronously
+  // indicate we'll call sendResponse asynchronously (for branches that need it)
   return true;
 });
 
@@ -506,9 +570,9 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     console.error("[BugSense] tabs.onUpdated handler error:", outer);
   }
 });
+
 // background/index.ts (in the service worker)
 // Replace or add this injection logic (non-invasive)
-
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   try {
     // only act when the tab finished loading and the url is a Google Sheet
@@ -588,15 +652,26 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 //----------------
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "GET_GOOGLE_TOKEN") {
-    chrome.identity.getAuthToken({ interactive: true }, (token) => {
-      if (chrome.runtime.lastError || !token) {
-        console.error("[BugSense Background] Failed to get auth token:", chrome.runtime.lastError);
-        sendResponse({ success: false, error: chrome.runtime.lastError });
-      } else {
-        console.log("[BugSense Background] Token acquired ✅");
+    // Wrap the chrome.identity.getAuthToken callback in a Promise to ensure we always call sendResponse.
+    (async () => {
+      try {
+        const token = await new Promise<string>((resolve, reject) => {
+          try {
+            chrome.identity.getAuthToken({ interactive: true }, (t: any) => {
+              if (chrome.runtime.lastError || !t) reject(chrome.runtime.lastError || new Error("No token"));
+              else resolve(t);
+            });
+          } catch (e) {
+            reject(e);
+          }
+        });
         sendResponse({ success: true, token });
+      } catch (e) {
+        console.error("[BugSense Background] Failed to get auth token:", e);
+        sendResponse({ success: false, error: String(e) });
       }
-    });
+    })();
+
     return true; // keep message channel open for async response
   }
 });
@@ -649,57 +724,148 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
   }
 });
 
-
 //-------------------------------
+// bugsense_create_bug (single-shot)
 chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
   if (msg.action === "bugsense_create_bug") {
-    const { message, file, line, column, time } = msg.payload;
+    try {
+      const { message, file, line, column, time } = msg.payload;
 
-    // Take screenshot
-    const screenshot = await chrome.tabs.captureVisibleTab();
+      // Take screenshot
+      const screenshot = await chrome.tabs.captureVisibleTab();
 
-    // Construct bug object
-    const bug = {
-      title: `Bug from ${file ? file.split("/").pop() : "unknown source"}`,
-      description: message,
-      file,
-      line,
-      column,
-      time,
-      screenshot,
-      steps: "AI will generate reproduction steps from replay and context.",
-      createdAt: new Date().toLocaleString(),
-    };
+      // Construct bug object
+      const bug = {
+        title: `Bug from ${file ? file.split("/").pop() : "unknown source"}`,
+        description: message,
+        file,
+        line,
+        column,
+        time,
+        screenshot,
+        steps: "AI will generate reproduction steps from replay and context.",
+        createdAt: new Date().toLocaleString(),
+      };
 
-    await chrome.storage.local.set({ bugsense_clipboard: bug });
+      await chrome.storage.local.set({ bugsense_clipboard: bug });
 
-    console.log("✅ [BugSense] Bug saved to clipboard:", bug);
-    sendResponse({ success: true });
+      console.log("✅ [BugSense] Bug saved to clipboard:", bug);
+      sendResponse({ success: true });
+    } catch (err) {
+      console.error("bugsense_create_bug failed:", err);
+      sendResponse({ success: false, error: String(err) });
+    }
+    return true;
   }
 });
-// ✅ ADD THIS ENTIRE BLOCK
+
+// GET_REPLAY_LOGS handler (keeps channel open and responds)
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "GET_REPLAY_LOGS") {
-
-    // Read the replay actions from local storage
-    chrome.storage.local.get(["replayActionsLog"], (res) => {
-      if (chrome.runtime.lastError) {
-        console.warn("Error getting replay logs:", chrome.runtime.lastError);
-        sendResponse({ success: false, actions: [] });
-      } else {
-        const actions = res?.replayActionsLog || [];
-        console.log("[BugSense Background] Sent replay actions:", actions);
-        sendResponse({ success: true, actions: actions });
-      }
-    });
-
-    return true; // Keep the message channel open for the async response
+    try {
+      chrome.storage.local.get(["replayActionsLog"], (res) => {
+        if (chrome.runtime.lastError) {
+          console.warn("Error getting replay logs:", chrome.runtime.lastError);
+          sendResponse({ success: false, actions: [] });
+        } else {
+          const actions = res?.replayActionsLog || [];
+          console.log("[BugSense Background] Sent replay actions:", actions);
+          sendResponse({ success: true, actions: actions });
+        }
+      });
+    } catch (e) {
+      sendResponse({ success: false, error: String(e) });
+    }
+    return true;
   }
 });
 
+// OPEN_REPLAY_EXPORT_PAGE
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.action === "OPEN_REPLAY_EXPORT_PAGE") {
     const url = chrome.runtime.getURL("extension/replay-export/replay-export.html");
     chrome.tabs.create({ url, active: true });
+  }
+});
+
+// ======================================================
+// ✅ SINGLE handler for selective area capture
+// ======================================================
+let captureInProgress = false;
+
+chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
+  if (msg.action !== "HIDE_OVERLAY_AND_CAPTURE") return;
+
+  if (captureInProgress) {
+    console.warn("[BugSense] Capture already in progress, skipping duplicate");
+    return;
+  }
+  captureInProgress = true;
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.windowId) throw new Error("No active tab");
+
+    // Make sure overlay disappears visually
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab?.id ?? 0 },
+        func: () =>
+          new Promise<void>((resolve) => {
+            requestAnimationFrame(() => {
+              document.body.offsetHeight; // flush paint
+              resolve();
+            });
+          }),
+      });
+    } catch (err) {
+      console.warn("[BugSense] Repaint script failed:", err);
+    }
+
+    await new Promise((r) => setTimeout(r, 150));
+
+    // Do the capture (no sendResponse, pure async)
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" }, (url) => {
+        if (chrome.runtime.lastError || !url)
+          reject(chrome.runtime.lastError?.message || "captureVisibleTab failed");
+        else resolve(url);
+      });
+    });
+
+    const blob = await (await fetch(dataUrl)).blob();
+    const bitmap = await createImageBitmap(blob);
+    const scale = self.devicePixelRatio || 1;
+    const canvas = new OffscreenCanvas(msg.rect.width, msg.rect.height);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("No OffscreenCanvas context");
+
+    ctx.drawImage(
+      bitmap,
+      msg.rect.x * scale,
+      msg.rect.y * scale,
+      msg.rect.width * scale,
+      msg.rect.height * scale,
+      0,
+      0,
+      msg.rect.width,
+      msg.rect.height
+    );
+    bitmap.close();
+
+    const croppedBlob = await canvas.convertToBlob({ type: "image/png", quality: 1 });
+    const reader = new FileReader();
+    reader.onload = () => {
+      chrome.runtime.sendMessage({
+        action: "TRIGGER_BUG_CREATION_FROM_CONTEXT",
+        mode: "selective",
+        screenshot: reader.result,
+      });
+      captureInProgress = false;
+    };
+    reader.readAsDataURL(croppedBlob);
+  } catch (err) {
+    console.error("[BugSense] Selective capture failed:", err);
+    captureInProgress = false;
   }
 });

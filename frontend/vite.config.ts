@@ -48,12 +48,14 @@ export default defineConfig({
         consoleListener: resolve(__dirname, "extension/content/consoleListener.ts"),
         recorder: resolve(__dirname, "extension/recorder/recorder.html"),
         replayExport: resolve(__dirname, "extension/replay-export/replay-export.html"),
+        selectionOverlay: resolve(__dirname, "extension/content/selectionOverlay.ts"),
         // NOTE: Do NOT add devtools HTML here — devtools build is separate
       },
       output: {
         entryFileNames: (chunk) => {
           if (chunk.name === "background") return "extension/background/[name].js";
           if (chunk.name === "replayListener") return "extension/content/[name].js";
+          if (chunk.name === "selectionOverlay") return "extension/content/[name].js";
           return "assets/[name]-[hash].js";
         },
       },
