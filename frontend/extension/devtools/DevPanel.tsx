@@ -29,16 +29,6 @@ type BugClipboard = {
   replayActions?: any[];
 };
 
-// Ask user for additional bug details (optional)
-async function promptForExtraDetails() {
-  return new Promise<string | null>((resolve) => {
-    const extra = prompt(
-      "📝 Optional: Add extra context or details about this bug (leave blank to skip)",
-      ""
-    );
-    resolve(extra && extra.trim().length > 0 ? extra.trim() : null);
-  });
-}
 
 
 export default function DevPanel() {
@@ -48,6 +38,10 @@ export default function DevPanel() {
   const [successBanner, setSuccessBanner] = useState(false);
   const [clipboardData, setClipboardData] = useState<BugClipboard | null>(null);
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+
+  const [showExtraModal, setShowExtraModal] = useState(false);
+  const [extraText, setExtraText] = useState("");
+  const [onExtraConfirm, setOnExtraConfirm] = useState<null | ((text: string | null) => void)>(null);
 
   // ... (All your useEffects and functions from createBug... to insertIntoSheet... are unchanged) ...
 
@@ -72,6 +66,15 @@ export default function DevPanel() {
     chrome.storage.onChanged.addListener(onChange);
     return () => chrome.storage.onChanged.removeListener(onChange);
   }, []);
+
+  // Ask user for additional bug details (optional)
+  function promptForExtraDetails(): Promise<string | null> {
+    return new Promise((resolve) => {
+      setExtraText("");
+      setOnExtraConfirm(() => resolve);
+      setShowExtraModal(true);
+    });
+  }
 
   const captureScreenshot = useCallback(async () => {
     return new Promise<string | null>((resolve) => {
@@ -101,7 +104,7 @@ export default function DevPanel() {
       selectionText?: string;
       srcUrl?: string;
       linkUrl?: string;
-      extraDetails?: string; // ✅ new field
+      extraDetails?: string | null; // ✅ new field
     },
     screenshot: string | null,
     replayActions: any[]
@@ -506,6 +509,86 @@ export default function DevPanel() {
           </SyntaxHighlighter>
         </div>
       )}
+
+      {showExtraModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              background: "#0B1220",
+              color: "white",
+              padding: 20,
+              borderRadius: 8,
+              width: "90%",
+              maxWidth: 400,
+              boxShadow: "0 0 10px rgba(0,0,0,0.5)",
+            }}
+          >
+            <h3 style={{ marginTop: 0 }}>📝 Add Extra Details (optional)</h3>
+            <textarea
+              value={extraText}
+              onChange={(e) => setExtraText(e.target.value)}
+              placeholder="Describe more about the issue, environment, or special conditions (optional)..."
+              style={{
+                width: "100%",
+                height: 120,
+                padding: 8,
+                borderRadius: 6,
+                border: "1px solid #333",
+                background: "#1b1f2b",
+                color: "#eee",
+                resize: "none",
+                fontSize: 13,
+                fontFamily: "Inter, sans-serif",
+              }}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+              <button
+                style={{
+                  background: "#555",
+                  color: "#fff",
+                  border: "none",
+                  padding: "6px 10px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                }}
+                onClick={() => {
+                  setShowExtraModal(false);
+                  if (onExtraConfirm) onExtraConfirm(null);
+                }}
+              >
+                Skip
+              </button>
+              <button
+                style={{
+                  background: "#3a7dff",
+                  color: "white",
+                  border: "none",
+                  padding: "6px 10px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                }}
+                onClick={() => {
+                  setShowExtraModal(false);
+                  if (onExtraConfirm) onExtraConfirm(extraText.trim() || null);
+                }}
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
