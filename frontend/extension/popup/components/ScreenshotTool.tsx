@@ -1,6 +1,8 @@
 // extension/popup/components/ScreenshotTool.tsx
 import React, { useEffect, useState } from "react";
 import DisplayButton from "../../components/DisplayButton";
+import { FaDownload, FaEdit } from "react-icons/fa";
+import { MdEdit } from "react-icons/md";
 
 export default function ScreenshotTool({
   onAnnotate,
@@ -69,17 +71,27 @@ export default function ScreenshotTool({
             className="rounded shadow-md mb-2 max-h-40 mx-auto"
           />
           <div className="flex justify-center space-x-2">
+
             <button
               onClick={downloadScreenshot}
-              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded"
+              className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md font-medium text-white shadow-sm transition bg-green-500 hover:bg-green-600
+                `}
             >
-              💾 Download Full
+              <>
+                <FaDownload size={14} />
+                <span className="text-xs font-semibold">Download</span>
+              </>
             </button>
+
             <button
               onClick={() => onAnnotate?.(imageUrl)}
-              className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded"
+              className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md font-medium text-white shadow-sm transition bg-yellow-500 hover:bg-yellow-600
+                `}
             >
-              ✏️ Annotate
+              <>
+                <MdEdit size={14} />
+                <span className="text-xs font-semibold">Annotate</span>
+              </>
             </button>
           </div>
           {filename && <div className="text-xs text-gray-500 mt-1">{filename}</div>}

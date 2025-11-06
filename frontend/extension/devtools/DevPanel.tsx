@@ -301,7 +301,7 @@ export default function DevPanel() {
       // maxWidth: 420, // <-- REMOVED THIS
       // margin: '0 auto', // <-- REMOVED THIS
       fontFamily: "Inter, Roboto, sans-serif",
-      background: "#2d2d2d",
+      background: "#0B1220",
       color: "#e0e0e0",
       minHeight: "100vh",
       boxSizing: 'border-box' // Keep padding from breaking layout
