@@ -74,7 +74,7 @@ export default function ScreenshotTool({
 
             <button
               onClick={downloadScreenshot}
-              className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md font-medium text-white shadow-sm transition bg-green-500 hover:bg-green-600
+              className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md font-medium text-white shadow-sm transition bg-indigo-600 hover:bg-indigo-700
                 `}
             >
               <>
