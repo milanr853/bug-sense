@@ -43,7 +43,7 @@ export default function App() {
   }
 
   return (
-    <div className="w-[320px] p-3 shadow-lg bg-blue-950">
+    <div className="w-[320px] p-3 shadow-lg bg-[#0B1220]">
       <Header />
 
       <div className="mt-3 space-y-3">

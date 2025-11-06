@@ -1,6 +1,8 @@
 // extension/content/duplicateBugDetector.ts
 import { findDuplicates } from "../ai/transformer";
-import { getSheetData, highlightDuplicates } from "../utils/sheetsAPI";
+import { clearHighlights, getSheetData, highlightDuplicates } from "../utils/sheetsAPI";
+import { addIgnoredPair, getIgnoredPairs, isIgnoredPair } from "../utils/cache";
+
 
 console.log("%c[BugSense] AI Duplicate Bug Detector Active 🧠", "color:#22d3ee");
 
@@ -41,16 +43,25 @@ async function initDuplicateDetector() {
     // Find duplicates (via AI/semantic or string match)
     const dupResult = await findDuplicates(itemsForEmbedding, 0.86);
     const pairs = dupResult.pairs ?? [];
+    // Filter out previously ignored pairs
+    const ignored = await getIgnoredPairs();
+    const filteredPairs = pairs.filter((p) => {
+      const key = [p.i, p.j].sort().join("-");
+      return !ignored.includes(key);
+    });
+
+    console.log(`[BugSense] ${filteredPairs.length} active duplicate pairs after ignoring cached ones.`);
+
 
     console.log(`[BugSense] Duplicate check complete — found ${pairs.length} pairs.`);
 
-    if (pairs.length > 0) {
+    if (filteredPairs.length > 0) {
       // Call highlight function to mark them red
-      await highlightDuplicates(spreadsheetId, rows, pairs);
+      await highlightDuplicates(spreadsheetId, rows, filteredPairs);
     }
 
     // Show enhanced overlay summary
-    renderOverlaySummary(pairs, itemsForEmbedding.length);
+    renderOverlaySummary(filteredPairs, itemsForEmbedding.length);
   } catch (err) {
     console.error("[BugSense] Sheets API failed:", err);
   }
@@ -66,16 +77,16 @@ function renderOverlaySummary(pairs: any[], totalRows: number) {
     bottom: "12px",
     background: "#0b1220",
     color: "white",
-    padding: "12px",
+    padding: "14px",
     borderRadius: "8px",
     zIndex: "999999",
-    width: "320px",
+    width: "340px",
     fontFamily: "Inter, sans-serif",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.25)"
+    boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
   });
 
   const title = document.createElement("div");
-  title.innerText = "BugSense — Duplicate Report";
+  title.innerText = "🧠 BugSense — Duplicate Verification";
   title.style.fontWeight = "bold";
   title.style.marginBottom = "6px";
   overlay.appendChild(title);
@@ -85,67 +96,94 @@ function renderOverlaySummary(pairs: any[], totalRows: number) {
     body.innerText = "✅ No duplicates found!";
   } else {
     const rowIndices: number[] = [];
-    pairs.forEach((p: any) => {
-      if (Array.isArray(p)) {
-        // some AI functions return [i, j] form
-        rowIndices.push(...p.map((id: number) => id + 2)); // +2 because we skipped header
-      } else if (p.i !== undefined && p.j !== undefined) {
-        rowIndices.push(p.i + 2, p.j + 2);
-      }
-    });
+    pairs.forEach((p: any) => rowIndices.push(p.i + 2, p.j + 2));
     const uniqueRows = [...new Set(rowIndices.sort((a, b) => a - b))];
-    body.innerText = `⚠️ ${pairs.length} duplicate ${pairs.length > 1 ? "pairs" : "pair"
-      } detected! (Rows ${uniqueRows.join(", ")})`;
+    body.innerText = `⚠️ ${pairs.length} potential duplicates found (Rows ${uniqueRows.join(", ")})`;
   }
   overlay.appendChild(body);
 
-  // Add buttons
+  // 🧩 Add buttons
   const footer = document.createElement("div");
-  footer.style.marginTop = "8px";
+  footer.style.marginTop = "10px";
   footer.style.display = "flex";
   footer.style.justifyContent = "space-between";
-  footer.style.alignItems = "center";
+  footer.style.gap = "8px";
+
+  const confirmDup = document.createElement("button");
+  confirmDup.innerText = "Confirm Duplicates";
+  Object.assign(confirmDup.style, {
+    flex: "1",
+    padding: "6px 10px",
+    background: "#22c55e",
+    color: "white",
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+
+  });
+
+  confirmDup.onclick = async () => {
+    alert("Duplicates confirmed. You can now remove them manually from your sheet.");
+    overlay.remove();
+  };
+
+  const markNotDup = document.createElement("button");
+  markNotDup.innerText = "Mark as Not Duplicates";
+  Object.assign(markNotDup.style, {
+    flex: "1",
+    padding: "6px 10px",
+    background: "#eab308",
+    color: "#0b1220",
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+  });
+
+  // inside the onclick:
+  markNotDup.onclick = async () => {
+    // cache as ignored
+    for (const p of pairs) {
+      await addIgnoredPair(p.i, p.j);
+    }
+
+    // remove red highlight from Google Sheet
+    try {
+      const match = window.location.href.match(/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      const spreadsheetId = match ? match[1] : null;
+      if (spreadsheetId) {
+        await clearHighlights(spreadsheetId, pairs);
+      }
+    } catch (err) {
+      console.error("[BugSense] Failed to clear highlights:", err);
+    }
+
+    alert("Marked as not duplicates — highlights removed and will be skipped next time.");
+    overlay.remove();
+  };
 
   const close = document.createElement("button");
   close.innerText = "Close";
   Object.assign(close.style, {
-    padding: "4px 8px",
-    border: "none",
+    flex: "1",
+    padding: "6px 10px",
     background: "#ef4444",
     color: "white",
+    border: "none",
     borderRadius: "6px",
     cursor: "pointer",
   });
   close.onclick = () => overlay.remove();
 
-  // Add reconnect button
-  const reconnectBtn = document.createElement("button");
-  reconnectBtn.textContent = "Reconnect Google";
-  Object.assign(reconnectBtn.style, {
-    background: "#2563eb",
-    color: "white",
-    border: "none",
-    borderRadius: "6px",
-    padding: "4px 8px",
-    cursor: "pointer",
-  });
-
-  reconnectBtn.onclick = () => {
-    chrome.identity.clearAllCachedAuthTokens(() => {
-      chrome.identity.getAuthToken({ interactive: true }, (token) => {
-        if (token) {
-          console.log("[BugSense] Reconnected with Google ✅");
-          alert("Successfully reconnected!");
-        } else {
-          console.error("[BugSense] Reconnect failed:", chrome.runtime.lastError);
-          alert("Reconnect failed. Try again.");
-        }
-      });
-    });
-  };
-
+  footer.appendChild(confirmDup);
+  footer.appendChild(markNotDup);
   footer.appendChild(close);
-  footer.appendChild(reconnectBtn);
+  // 💡 Tip section (👉 append here, before the footer)
+  const tip = document.createElement("div");
+  tip.innerHTML = "<small>💡 Tip: Once confirmed, open your sheet and delete marked rows manually to keep it clean.</small>";
+  tip.style.marginTop = "8px";
+  tip.style.color = "#9ca3af";
+  overlay.appendChild(tip);
+
   overlay.appendChild(footer);
 
   document.body.appendChild(overlay);
