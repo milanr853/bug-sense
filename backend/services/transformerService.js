@@ -28,7 +28,15 @@ export async function initAI() {
 
 // Analyze bug text and generate report
 export async function analyzeBug(input = {}) {
-  const { console: consoleError, selectionText, srcUrl, linkUrl, replayActions } = input;
+  const {
+    console: consoleError,
+    selectionText,
+    srcUrl,
+    linkUrl,
+    replayActions,
+    extraDetails,
+  } = input;
+
 
   let contextText = "";
   if (consoleError) {
@@ -47,6 +55,10 @@ Stack: ${consoleError.stack || ""}
   }
 
   contextText += `\nActions before error: ${JSON.stringify(replayActions?.slice(-5) || [], null, 2)}`;
+
+  if (extraDetails) {
+    contextText += `\n\n🔍 Additional User Notes:\n${extraDetails}`;
+  }
 
   await initAI();
 

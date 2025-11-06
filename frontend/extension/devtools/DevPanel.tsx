@@ -29,6 +29,18 @@ type BugClipboard = {
   replayActions?: any[];
 };
 
+// Ask user for additional bug details (optional)
+async function promptForExtraDetails() {
+  return new Promise<string | null>((resolve) => {
+    const extra = prompt(
+      "📝 Optional: Add extra context or details about this bug (leave blank to skip)",
+      ""
+    );
+    resolve(extra && extra.trim().length > 0 ? extra.trim() : null);
+  });
+}
+
+
 export default function DevPanel() {
   const [errors, setErrors] = useState<ConsoleErrorItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -84,7 +96,13 @@ export default function DevPanel() {
   }, []);
 
   const callAIForBug = useCallback(async (
-    source: { console?: ConsoleErrorItem; selectionText?: string; srcUrl?: string; linkUrl?: string },
+    source: {
+      console?: ConsoleErrorItem;
+      selectionText?: string;
+      srcUrl?: string;
+      linkUrl?: string;
+      extraDetails?: string; // ✅ new field
+    },
     screenshot: string | null,
     replayActions: any[]
   ) => {
@@ -97,6 +115,7 @@ export default function DevPanel() {
           ...source,
           screenshot,
           replayActions,
+          extraDetails: source.extraDetails || null,
         }),
       });
 
@@ -135,9 +154,15 @@ export default function DevPanel() {
       const screenshot = await captureScreenshot();
       setMessage("Fetching recent replay actions...");
       const replayActions = await getReplayActions();
+      // 🧠 Ask user for optional details
+      const extraDetails = await promptForExtraDetails();
       setMessage("🤖 Analyzing with BugSense AI... This may take a few seconds ⏳");
 
-      const ai = await callAIForBug({ console: item }, screenshot, replayActions);
+      const ai = await callAIForBug(
+        { console: item, extraDetails },
+        screenshot,
+        replayActions
+      );
 
       const bug: BugClipboard = {
         title: ai.title,
@@ -167,9 +192,12 @@ export default function DevPanel() {
       const screenshot = await captureScreenshot();
       setMessage("Fetching recent replay actions...");
       const replayActions = await getReplayActions();
+      // 🧠 Ask user for optional details
+      const extraDetails = await promptForExtraDetails();
       setMessage("🤖 Analyzing UI bug with BugSense AI... ⏳");
 
-      const ai = await callAIForBug(context, screenshot, replayActions);
+      const ai = await callAIForBug({ ...context, extraDetails }, screenshot, replayActions);
+
 
       let rawSource = context.selectionText
         ? { type: "selection" as const, raw: { text: context.selectionText } }
