@@ -18,7 +18,7 @@ export default function App() {
   const Header = () => (
     <div className="flex items-center justify-between">
       <div>
-        <div className="text-lg font-semibold text-gray-400 mb-2 flex items-center" >
+        <div className="text-lg font-semibold text-gray-400 mb-3 flex items-center" >
           <img
             src="../icons/icon48.png"
             alt="Bug Sense icon"
@@ -30,7 +30,7 @@ export default function App() {
           />
           <div>Bug Sense</div>
         </div>
-        <div className="text-xs text-gray-400">v1.0.0</div>
+        {/* <div className="text-xs text-gray-400">v1.0.0</div> */}
       </div>
       <div />
     </div>
