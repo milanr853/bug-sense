@@ -338,12 +338,7 @@ export default function DevPanel() {
       boxSizing: 'border-box' // Keep padding from breaking layout
     }}>
       {/* ... (rest of the component is unchanged) ... */}
-      <h3 style={{
-        marginBottom: 8,
-        display: 'flex',
-        alignItems: 'center',
-        color: "#ffffff"
-      }}>
+      <div className="text-lg font-semibold text-gray-400 mb-2 flex items-center" >
         <img
           src="../icons/icon48.png"
           alt="Bug Sense icon"
@@ -353,8 +348,8 @@ export default function DevPanel() {
             height: 20
           }}
         />
-        Bug Sense — Console captures
-      </h3>
+        <div>Bug Sense — Console captures</div>
+      </div>
 
       <div style={{ marginBottom: 8, color: "#a0a0a0", fontSize: 12 }}>
         Select a console message to create an AI-generated bug report. Uses instant screenshot + replay buffer.

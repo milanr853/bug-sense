@@ -18,7 +18,18 @@ export default function App() {
   const Header = () => (
     <div className="flex items-center justify-between">
       <div>
-        <h2 className="text-lg font-semibold text-gray-400">Bug Sense</h2>
+        <div className="text-lg font-semibold text-gray-400 mb-2 flex items-center" >
+          <img
+            src="../icons/icon48.png"
+            alt="Bug Sense icon"
+            style={{
+              marginRight: 8,
+              width: 20,
+              height: 20
+            }}
+          />
+          <div>Bug Sense</div>
+        </div>
         <div className="text-xs text-gray-400">v1.0.0</div>
       </div>
       <div />
