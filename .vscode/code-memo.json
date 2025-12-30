@@ -12,6 +12,18 @@
         "hash": "f69099ea973b865d0c53b3ce4d88fe3ec721f3c5"
       },
       "createdAt": "2025-12-30T05:44:58.866Z"
+    },
+    {
+      "id": "memo-i069p8a2",
+      "code": {
+        "file": "frontend/documents/general_info.md",
+        "line": 4
+      },
+      "note": {
+        "file": "frontend/package.json",
+        "hash": "ef9687689b9f68a6d663a7ae9d29b8576809bd2c"
+      },
+      "createdAt": "2025-12-30T06:28:01.013Z"
     }
   ]
 }
