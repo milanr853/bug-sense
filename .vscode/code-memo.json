@@ -2,18 +2,6 @@
   "version": "1.0",
   "links": [
     {
-      "id": "memo-vo4nyq8j",
-      "code": {
-        "file": "frontend/documents/general_info.md",
-        "line": 4
-      },
-      "note": {
-        "file": "frontend/global.d.ts",
-        "hash": "f69099ea973b865d0c53b3ce4d88fe3ec721f3c5"
-      },
-      "createdAt": "2025-12-30T05:44:58.866Z"
-    },
-    {
       "id": "memo-i069p8a2",
       "code": {
         "file": "frontend/documents/general_info.md",
